@@ -1,0 +1,19 @@
+* HW2Q3 (converted from Multisim)
+rR1 3 2 1k vresR1  
+.model vresR1 r(  )
+
+rR2 2 1 3k vresR2  
+.model vresR2 r(  )
+
+lL1 1 0 0.5 
+
+cC1 2 0 0.2u 
+
+vV1 3 0 dc 0 ac 5 90
++      distof1 0 0
++      distof2 0 0
++      sin(0 7.071067810000001 477.707 0 0 90)
+
+Rshunt_3 3 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_1 1 0 1e12

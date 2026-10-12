@@ -1,0 +1,14 @@
+* Tutorial 7 (converted from Multisim)
+rR1 1 0 250 vresR1  
+.model vresR1 r(  )
+
+cC1 1 0 1.5u 
+
+lL1 1 0 650m 
+
+vV1 1 0 dc 0 ac 1 0
++      distof1 0 0
++      distof2 0 0
++      sin(0 169.70562744 60 0 0 0)
+
+Rshunt_1 1 0 1e12

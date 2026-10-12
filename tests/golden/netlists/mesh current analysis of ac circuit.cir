@@ -1,0 +1,40 @@
+* mesh current analysis of ac circuit (converted from Multisim)
+rR1 2 1 2 vresR1  
+.model vresR1 r(  )
+
+rR2 2 5 2 vresR2  
+.model vresR2 r(  )
+
+rR3 4 5 2 vresR3  
+.model vresR3 r(  )
+
+rR4 5 3 2 vresR4  
+.model vresR4 r(  )
+
+rR5 4 7 2 vresR5  
+.model vresR5 r(  )
+
+rR6 2 6 3 vresR6  
+.model vresR6 r(  )
+
+cC1 6 0 0.25m 
+
+lL1 7 0 1m 
+
+vV3 3 0 dc 0 ac -6j 90
++      distof1 0 0
++      distof2 0 0
++      sin(0 -8.485281372 159.23 0 0 90)
+
+vV4 4 1 dc 0 ac 12 0
++      distof1 0 0
++      distof2 0 0
++      sin(0 16.970562744 159.23 0 0 0)
+
+Rshunt_2 2 0 1e12
+Rshunt_1 1 0 1e12
+Rshunt_5 5 0 1e12
+Rshunt_4 4 0 1e12
+Rshunt_3 3 0 1e12
+Rshunt_7 7 0 1e12
+Rshunt_6 6 0 1e12

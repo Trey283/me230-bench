@@ -1,0 +1,19 @@
+* Design20 (converted from Multisim)
+vV1 1 0 dc 12 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+rR1 1 2 1k vresR1  
+.model vresR1 r(  )
+
+dD1 0 2 1N4732A
+
+rR2 2 0 10k vresR2  
+.model vresR2 r(  )
+
+.MODEL 1N4732A D IS= 5.038e-012 RS= 0.001 CJO= 1e-012 VJ= 0.75
++                TT= 5e-009 M= 0.3333 BV= 4.704 IBV= 0.06101 N= 1
++                EG= 1.11 XTI= 3 KF= 0 AF= 1 FC= 0.5
++                TNOM= 27
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12

@@ -1,0 +1,13 @@
+* Design7 (converted from Multisim)
+vV1 1 0 pwl(0 0 1e-8 5 1.00000001 5)
+
+rR1 1 2 1k vresR1  
+.model vresR1 r(  )
+
+lL1 2 3 10m 
+
+cC1 3 0 1u 
+
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_3 3 0 1e12

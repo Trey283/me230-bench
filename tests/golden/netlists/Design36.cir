@@ -1,0 +1,241 @@
+* Design36 (converted from Multisim)
+dD1 3 1 D1N4007_VSH
+
+rR1 2 0 5 vresR1  
+.model vresR1 r(  )
+
+XMM1 3 1 XXMM1_213548424
+
+XMM2 1 2 XXMM1_213548424
+
+* * !!!BEGIN-INTERACT
+*  : increment  ++++f8 ;
+*  : tmaxvalue  ++++f4 ;
+*  : tminvalue  ++++f6 ;
+*  0.0          constant mindval
+*  100.0        constant maxdval
+*  tmaxvalue    VARIABLE maxvalue
+*  tminvalue    VARIABLE minvalue
+*  50.0         VARIABLE setting
+*  0            VARIABLE num_stored
+*  0.0          VARIABLE setsourceval
+*  0.0          VARIABLE zeroadj
+*  0.0          VARIABLE setfactor
+*  0            VARIABLE flag
+*  0.0          VARIABLE outputval
+*
+*  :MAP_KEYBOARD_INPUT ++++k1 1 ++++K1  -1 ;
+*
+*  : UPDATE_SETTINGS
+*     *flag 0 = if
+*        LOAD_FICL_VARIABLES
+*        ==>_*num_stored
+*        ==>_*num_stored
+*        *num_stored 0 > if
+*           ==>_*setting 
+*           ==>_*setsourceval
+*          *setsourceval SET_INSTANCE vsource ::V V1  dc
+*        endif
+*      1 ==>_*flag
+*      endif
+*      0.01 *setting f.* ==>_*setfactor
+*      tmaxvalue tminvalue f.- *setfactor f.* tminvalue f.+ ==>_*outputval
+*      *outputval VALUE 0 SET_ANIMATION_TEXT_BYID
+*      *outputval maxvalue GRADUAL_CHANGE_AT_RUN
+*      *outputval *setting 2 0
+*      STORE_FICL_VARIABLES
+*  ;
+*
+*  :GRADUAL_CHANGE_AT_RUN locals| ref value |
+*    value SET_INSTANCE vsource ::V V1  dc
+*  ;
+*
+*  :KEYBOARD_INPUT locals| shift_state |
+*     shift_state (float) increment f.* *setting  f.+  ==>_*setting
+*     mindval maxdval *setting f.min f.max ==>_*setting
+*     UPDATE_SETTINGS
+*  ;
+*
+*  :BEGIN_PLOT
+*     UPDATE_SETTINGS
+*  ;
+*
+*  :BEGIN_ANALYSIS
+*    UPDATE_SETTINGS
+*  ;
+*
+*  : INIT_SLIDER
+*      maxdval mindval 3 IMOUSE_SET
+*  ;
+*
+*  : ON_IMOUSE_EVENT locals| eType fValue |
+*    eType 9 = if
+*      -1
+*      fValue ==>_*setting
+*    else
+*      0
+*    endif
+*    UPDATE_SETTINGS
+*  ;
+*
+*  : GET_INTERACT_VALUE locals| eType |
+*      eType 0 = if
+*        *setting
+*      else eType 1 = if
+*        mindval
+*      else eType 2 = if
+*        maxdval
+*      else eType 3 = if
+*        increment
+*      else
+*        0
+*      endif endif endif endif
+*  ;
+*
+*  : SET_INTERACT_VALUE locals| eType fValue |
+*      eType 0 = if
+*        fValue ==>_*setting
+*      endif
+*      UPDATE_SETTINGS
+*  ;
+*
+*  :ON_USER_UPDATE
+*    UPDATE_SETTINGS
+*    INIT_SLIDER
+*  ;
+*
+* !!!END-INTERACT
+xV1 3 0 VariableDCVoltageV1
+.subckt VariableDCVoltageV1 1 2
+V1 1 2  10
+.ends
+
+rR2 4 0 5 vresR2  
+.model vresR2 r(  )
+
+XMM3 6 5 XXMM3_213548424
+
+XMM4 5 4 XXMM3_213548424
+
+* * !!!BEGIN-INTERACT
+*  : increment  ++++f8 ;
+*  : tmaxvalue  ++++f4 ;
+*  : tminvalue  ++++f6 ;
+*  0.0          constant mindval
+*  100.0        constant maxdval
+*  tmaxvalue    VARIABLE maxvalue
+*  tminvalue    VARIABLE minvalue
+*  50.0         VARIABLE setting
+*  0            VARIABLE num_stored
+*  0.0          VARIABLE setsourceval
+*  0.0          VARIABLE zeroadj
+*  0.0          VARIABLE setfactor
+*  0            VARIABLE flag
+*  0.0          VARIABLE outputval
+*
+*  :MAP_KEYBOARD_INPUT ++++k1 1 ++++K1  -1 ;
+*
+*  : UPDATE_SETTINGS
+*     *flag 0 = if
+*        LOAD_FICL_VARIABLES
+*        ==>_*num_stored
+*        ==>_*num_stored
+*        *num_stored 0 > if
+*           ==>_*setting 
+*           ==>_*setsourceval
+*          *setsourceval SET_INSTANCE vsource ::V V1  dc
+*        endif
+*      1 ==>_*flag
+*      endif
+*      0.01 *setting f.* ==>_*setfactor
+*      tmaxvalue tminvalue f.- *setfactor f.* tminvalue f.+ ==>_*outputval
+*      *outputval VALUE 0 SET_ANIMATION_TEXT_BYID
+*      *outputval maxvalue GRADUAL_CHANGE_AT_RUN
+*      *outputval *setting 2 0
+*      STORE_FICL_VARIABLES
+*  ;
+*
+*  :GRADUAL_CHANGE_AT_RUN locals| ref value |
+*    value SET_INSTANCE vsource ::V V1  dc
+*  ;
+*
+*  :KEYBOARD_INPUT locals| shift_state |
+*     shift_state (float) increment f.* *setting  f.+  ==>_*setting
+*     mindval maxdval *setting f.min f.max ==>_*setting
+*     UPDATE_SETTINGS
+*  ;
+*
+*  :BEGIN_PLOT
+*     UPDATE_SETTINGS
+*  ;
+*
+*  :BEGIN_ANALYSIS
+*    UPDATE_SETTINGS
+*  ;
+*
+*  : INIT_SLIDER
+*      maxdval mindval 3 IMOUSE_SET
+*  ;
+*
+*  : ON_IMOUSE_EVENT locals| eType fValue |
+*    eType 9 = if
+*      -1
+*      fValue ==>_*setting
+*    else
+*      0
+*    endif
+*    UPDATE_SETTINGS
+*  ;
+*
+*  : GET_INTERACT_VALUE locals| eType |
+*      eType 0 = if
+*        *setting
+*      else eType 1 = if
+*        mindval
+*      else eType 2 = if
+*        maxdval
+*      else eType 3 = if
+*        increment
+*      else
+*        0
+*      endif endif endif endif
+*  ;
+*
+*  : SET_INTERACT_VALUE locals| eType fValue |
+*      eType 0 = if
+*        fValue ==>_*setting
+*      endif
+*      UPDATE_SETTINGS
+*  ;
+*
+*  :ON_USER_UPDATE
+*    UPDATE_SETTINGS
+*    INIT_SLIDER
+*  ;
+*
+* !!!END-INTERACT
+xV2 6 0 VariableDCVoltageV2
+.subckt VariableDCVoltageV2 1 2
+V1 1 2  10
+.ends
+
+dD2 5 6 D1N4007_VSH
+
+.model D1N4007_VSH d is = 1.43733E-008 n = 1.80829 rs = 0.0414712
++ eg = 1.11 xti = 3 tnom = 27
++ cjo = 2.8119E-011 vj = 0.700053 m = 0.346714 fc = 0.5
++ tt = 4.10886E-006 bv = 1100 ibv = 10 af = 1 kf = 0
+.subckt XXMM1_213548424 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM3_213548424 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+Rshunt_3 3 0 1e12
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_4 4 0 1e12
+Rshunt_6 6 0 1e12
+Rshunt_5 5 0 1e12

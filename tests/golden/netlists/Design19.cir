@@ -1,0 +1,49 @@
+* Design19 (converted from Multisim)
+vV1 5 6 dc 0 ac 1 0
++      distof1 0 0
++      distof2 0 0
++      sin(0 311.12698364 50 0 0 0)
+
+xT1 5 6 4 2 Tran_T1
+.subckt Tran_T1 p1pos p1neg s1pos s1neg
+***Primary coil 1
+G1 p1pos p1neg value={-1/220*(12*I(Es1))}
+
+***Secondary coil 1
+Es1 s1pos s1neg value={V(p1pos,p1neg)*12/220}
+
+.ends
+
+dD1 0 4 D1N4007_VSH
+
+cC1 1 0 30u 
+
+dD2 4 1 D1N4007_VSH
+
+dD3 0 2 D1N4007_VSH
+
+dD4 2 1 D1N4007_VSH
+
+dD6 0 7 1N4734A
+
+rR1 1 7 48 vresR1  
+.model vresR1 r(  )
+
+rR2 7 0 1k vresR2  
+.model vresR2 r(  )
+
+* scope XSC1
+.model D1N4007_VSH d is = 1.43733E-008 n = 1.80829 rs = 0.0414712
++ eg = 1.11 xti = 3 tnom = 27
++ cjo = 2.8119E-011 vj = 0.700053 m = 0.346714 fc = 0.5
++ tt = 4.10886E-006 bv = 1100 ibv = 10 af = 1 kf = 0
+.MODEL 1N4734A D IS= 5.038e-012 RS= 0.001 CJO= 1e-012 VJ= 0.75
++                TT= 5e-009 M= 0.3333 BV= 5.624 IBV= 0.115 N= 1
++                EG= 1.11 XTI= 3 KF= 0 AF= 1 FC= 0.5
++                TNOM= 27
+Rshunt_5 5 0 1e12
+Rshunt_6 6 0 1e12
+Rshunt_4 4 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_1 1 0 1e12
+Rshunt_7 7 0 1e12

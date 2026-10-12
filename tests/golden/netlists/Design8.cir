@@ -1,0 +1,77 @@
+* Design8 (converted from Multisim)
+vV1 1 0 dc 20 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+rR1 2 3 2 vresR1  
+.model vresR1 r(  )
+
+lL1 3 0 0.04 
+
+* * !!!BEGIN-INTERACT
+*  2.0 constant high
+*  0.0 constant low
+*  2   constant max_states
+*  low VARIABLE volt
+*
+*  :MAP_KEYBOARD_INPUT ++++K1 1 ++++k1 -1 ;
+*
+*  : UPDATE_SETTINGS
+*     *animation_state max_states  low  high  STATE  volt 
+*     GRADUAL_CHANGE_AT_RUN  
+*  ;
+*
+*  :KEYBOARD_INPUT locals| shift_state |
+*     shift_state *animation_state max_states NEXT_STATE_WRAP
+*                                             ==>_*animation_state
+*     UPDATE_SETTINGS
+*  ;
+*
+*  :GRADUAL_CHANGE_AT_RUN locals| ref value |
+*     value  SET_INSTANCE Vsource ::V  V2 dc
+*  ;
+*
+*  : INIT_IMOUSE_OPTION
+*    1 0 4 IMOUSE_SET
+*  ;
+*
+*  : GET_IMOUSE_SUBCOMPS ( -- [iIdxN ... iIdx1] )
+*    1
+*  ;
+*
+*  : ON_SUBCOMP_IMOUSE_EVENT locals| eEventType nOptions iSubCompIdx |
+*    eEventType 2 = if
+*      -1
+*      -1 KEYBOARD_INPUT
+*    else
+*      0
+*    endif
+*  ;
+*
+*  ( Initialize the settings )
+*   UPDATE_SETTINGS
+*   INIT_IMOUSE_OPTION
+*
+*  :BEGIN_PLOT
+*     UPDATE_SETTINGS
+*  ;
+*
+*  :BEGIN_ANALYSIS
+*    UPDATE_SETTINGS
+*  ;
+*
+* !!!END-INTERACT
+
+xS1 2 1   SwitchS1 Params: Ron=100u Roff=100Meg
+
+.subckt SwitchS1 1 2 Params: Ron=1e-8 Roff=1e30
+V2 5 0 DC 0
+R1 5 6 20
+V1 6 0 DC 0
+W0 2 1 V1 NC_contact 
+.model NC_contact csw(it=0.0375 ih=0.0125 ron=1 roff=1000000000000)
+.ENDS
+
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_3 3 0 1e12

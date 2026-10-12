@@ -1,0 +1,120 @@
+* Tutorial11 (converted from Multisim)
+* * !!!BEGIN-INTERACT
+*  : increment     ++++f4 ;
+*  : setresistance ++++f6 ;
+*  0.0             constant  mindval
+*  100.0           constant  maxdval
+*  0.0             VARIABLE  resistance
+*  50.0            VARIABLE  setting
+*  0.0             VARIABLE  setfactor
+*  0.0             VARIABLE  zeroadj
+*  0.0             VARIABLE  tresistance
+*  0               VARIABLE  num_stored
+*  0.0             VARIABLE  setresval
+*  0            VARIABLE  flag
+*
+*  :MAP_KEYBOARD_INPUT ++++k1 1 ++++K1  -1 ;
+*
+*  : UPDATE_SETTINGS
+*      *flag 0 = if
+*      LOAD_FICL_VARIABLES
+*      ==>_*num_stored
+*      ==>_*num_stored
+*      *num_stored 0 > if
+*         ==>_*setting 
+*         ==>_*setresval
+*         *setresval tresistance f./ ==>_*setfactor
+*         *setresval SET_INSTANCE Resistor ::R R1  resistance
+*         tresistance *setresval f.- SET_INSTANCE Resistor ::R R2  resistance
+*      endif
+*      1 ==>_*flag
+*      endif
+*      setresistance ==>_*tresistance
+*      0.01 *setting f.* ==>_*zeroadj
+*      *zeroadj PERCENT SET_ANIMATION_TEXT
+*      0.0000001 0.9999999 *zeroadj f.min f.max  ==>_*setfactor
+*      *setfactor *tresistance f.* resistance GRADUAL_CHANGE_AT_RUN
+*      *setfactor tresistance f.* *setting 2 0
+*      STORE_FICL_VARIABLES
+*  ;
+*
+*  :GRADUAL_CHANGE_AT_RUN locals| ref value |
+*    value                       SET_INSTANCE Resistor ::R R1  resistance
+*    *tresistance  value f.-       SET_INSTANCE Resistor ::R R2  resistance
+*  ;
+*
+*  :KEYBOARD_INPUT locals| shift_state |
+*     shift_state (float) increment f.* *setting  f.+  ==>_*setting
+*     mindval maxdval *setting f.min f.max ==>_*setting
+*     UPDATE_SETTINGS
+*  ;
+*
+*  :BEGIN_PLOT
+*     UPDATE_SETTINGS
+*  ;
+*
+*
+*  : INIT_SLIDER
+*      maxdval mindval 3 IMOUSE_SET
+*  ;
+*
+*  : ON_IMOUSE_EVENT locals| eType fValue |
+*    eType 9 = if
+*      -1
+*      fValue ==>_*setting
+*    else
+*      0
+*    endif
+*    UPDATE_SETTINGS
+*  ;
+*
+*  : GET_INTERACT_VALUE locals| eType |
+*      eType 0 = if
+*        *setting
+*      else eType 1 = if
+*        mindval
+*      else eType 2 = if
+*        maxdval
+*      else eType 3 = if
+*        increment
+*      else
+*        0
+*      endif endif endif endif
+*  ;
+*
+*  : SET_INTERACT_VALUE locals| eType fValue |
+*      eType 0 = if
+*        fValue ==>_*setting
+*      endif
+*      UPDATE_SETTINGS
+*  ;
+*
+*  :ON_USER_UPDATE
+*    UPDATE_SETTINGS
+*    INIT_SLIDER
+*  ;
+*
+*  :BEGIN_ANALYSIS
+*    UPDATE_SETTINGS
+*  ;
+*
+* !!!END-INTERACT
+xR1 1 nc_R1_2 2  PotentiometerR1
+.subckt PotentiometerR1 1 2 3
+R1 1 2  1e-3
+R2 2 3  1e-3
+.ends
+
+cC1 2 0 1u 
+
+XFG1 nc_XFG1_3 0 1 XXFG1_243046736
+
+* scope XSC1
+.subckt XXFG1_243046736 1 2 3
+vfgen_src_positive 3 2 dc 0.000000e+00 ac 1.000000000000000000e+01 pulse(-1.000000000000000000e+01 1.000000000000000000e+01 0 1.000000000000000021e-08 1.000000000000000021e-08 4.999999900000000053e-01 1.000000000000000000e+00)
+vfgen_src_negative 2 1 dc 0.000000e+00 ac 1.000000000000000000e+01 pulse(-1.000000000000000000e+01 1.000000000000000000e+01 0 1.000000000000000021e-08 1.000000000000000021e-08 4.999999900000000053e-01 1.000000000000000000e+00)
+.ends
+Rshunt_1 1 0 1e12
+Rshunt_nc_R1_2 nc_R1_2 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_nc_XFG1_3 nc_XFG1_3 0 1e12

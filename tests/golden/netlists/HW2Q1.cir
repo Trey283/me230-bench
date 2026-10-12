@@ -1,0 +1,43 @@
+* HW2Q1 (converted from Multisim)
+xZ1 2 0 Zload_indZ1 
+.SUBCKT Zload_indZ1 1 2
+R1 1 3 1e-3
+L1 3 2 5.004872423619938
+.ends
+
+xZ2 3 2 Zload_indZ2 
+.SUBCKT Zload_indZ2 1 2
+R1 1 3 1e-3
+L1 3 2 5.004872423619938
+.ends
+
+xZ3 3 1 Zload_indZ3 
+.SUBCKT Zload_indZ3 1 2
+R1 1 3 1e-3
+L1 3 2 5.004872423619938
+.ends
+
+xZ4 1 0 Zload_indZ4 
+.SUBCKT Zload_indZ4 1 2
+R1 1 3 1e-3
+L1 3 2 5.004872423619938
+.ends
+
+xZ5 2 1 Zload_capZ5
+.SUBCKT Zload_capZ5 1 2
+R1 1 3 1e-3
+C1 3 2 0.20019489694479753
+.ends
+
+rR1 4 3 5 vresR1  
+.model vresR1 r(  )
+
+vV1 4 0 dc 0 ac 25 45
++      distof1 0 0
++      distof2 0 0
++      sin(0 35.35533905 0.159 0 0 45)
+
+Rshunt_2 2 0 1e12
+Rshunt_3 3 0 1e12
+Rshunt_1 1 0 1e12
+Rshunt_4 4 0 1e12

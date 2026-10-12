@@ -1,0 +1,24 @@
+* Q9HW1 (converted from Multisim)
+rR1 1 4 2 vresR1  
+.model vresR1 r(  )
+
+rR2 4 0 3 vresR2  
+.model vresR2 r(  )
+
+rR3 4 0 6 vresR3  
+.model vresR3 r(  )
+
+vV1 1 0 dc 6 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+gI1 0 4 4 0 2
+
+XMM1 4 0 XXMM1_212720192
+
+.subckt XXMM1_212720192 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+Rshunt_1 1 0 1e12
+Rshunt_4 4 0 1e12

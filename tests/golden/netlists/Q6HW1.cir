@@ -1,0 +1,27 @@
+* Q6HW1 (converted from Multisim)
+rR1 2 3 2 vresR1  
+.model vresR1 r(  )
+
+rR2 3 4 4 vresR2  
+.model vresR2 r(  )
+
+rR3 2 4 2 vresR3  
+.model vresR3 r(  )
+
+rR4 4 0 2 vresR4  
+.model vresR4 r(  )
+
+rR5 3 0 2 vresR5  
+.model vresR5 r(  )
+
+rR6 1 2 1 vresR6  
+.model vresR6 r(  )
+
+vV1 1 0 dc 12 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+Rshunt_2 2 0 1e12
+Rshunt_3 3 0 1e12
+Rshunt_4 4 0 1e12
+Rshunt_1 1 0 1e12

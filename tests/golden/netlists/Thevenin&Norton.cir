@@ -1,0 +1,61 @@
+* Thevenin&Norton (converted from Multisim)
+rR1 1 5 5 vresR1  
+.model vresR1 r(  )
+
+rR2 1 2 10 vresR2  
+.model vresR2 r(  )
+
+rR3 2 0 20 vresR3  
+.model vresR3 r(  )
+
+rR4 2 3 5 vresR4  
+.model vresR4 r(  )
+
+rR5 3 4 10 vresR5  
+.model vresR5 r(  )
+
+vV1 5 0 dc 10 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+XMM1 4 0 XXMM1_215747416
+
+rR6 6 8 5 vresR6  
+.model vresR6 r(  )
+
+rR7 6 7 10 vresR7  
+.model vresR7 r(  )
+
+rR8 7 0 20 vresR8  
+.model vresR8 r(  )
+
+rR9 7 9 5 vresR9  
+.model vresR9 r(  )
+
+rR10 9 10 10 vresR10  
+.model vresR10 r(  )
+
+vV2 8 0 dc 10 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+XMM2 10 0 XXMM2_215747416
+
+.subckt XXMM1_215747416 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM2_215747416 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+Vam 2 1 dc 0
+.ends
+Rshunt_1 1 0 1e12
+Rshunt_5 5 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_3 3 0 1e12
+Rshunt_4 4 0 1e12
+Rshunt_6 6 0 1e12
+Rshunt_8 8 0 1e12
+Rshunt_7 7 0 1e12
+Rshunt_9 9 0 1e12
+Rshunt_10 10 0 1e12

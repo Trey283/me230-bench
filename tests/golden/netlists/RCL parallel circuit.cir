@@ -1,0 +1,14 @@
+* RCL parallel circuit (converted from Multisim)
+rR1 1 0 375 vresR1  
+.model vresR1 r(  )
+
+cC1 1 0 1u 
+
+lL1 1 0 1m 
+
+iI1 0 1
++   pulse( 0 1 0 1n 1n
++   0.005
++   0.01)
+
+Rshunt_1 1 0 1e12

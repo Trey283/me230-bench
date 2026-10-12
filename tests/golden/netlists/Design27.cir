@@ -1,0 +1,193 @@
+* Design27 (converted from Multisim)
+vV1 0 1 dc 12 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+vV2 3 0 dc 12 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+xQ1 2 1 0 BC264D
+
+* * !!!BEGIN-INTERACT
+*
+*  ( External state variables )
+*  1e-12  constant  low
+*  : Rshunt              ++++f1 ;
+*  : Mode                 ++++i3 ;
+*
+*  ( Internal state variables )
+*  0.0      VARIABLE   r1Cur
+*  0         VARIABLE   nTime
+*  0         VARIABLE   nTimeCur
+*
+*  high  VARIABLE r1_resistance
+*
+*
+* .( Loading the ammeter.. )  cr
+*
+*  :  RESET
+*       0.0  VALUE  SET_ANIMATION_TEXT
+*       Rshunt  SET_INSTANCE Resistor ::R r1 resistance
+*       1   RESET_ACDC
+*       GET_LOCAL_TIME   ==>_*nTime
+*  ;
+*
+*  :BEGIN_PLOT
+*    RESET
+*  ;
+*
+*  :OUT_DATA
+*   (( GET_INSTANCE Resistor ::R r1 i  ))  1 ADD_ACDC
+*   GET_LOCAL_TIME   ==>_*nTimeCur
+*   *nTimeCur *nTime - 2 >= if
+*   ((if Mode 1 GET_AC 1 GET_DC ))if   VALUE  SET_ANIMATION_TEXT
+*   *nTimeCur  ==>_*nTime
+*  endif
+*  ;
+*
+* :  BEGIN_ANALYSIS 
+*        RESET
+*    ;
+*     1  ACDC::ALLOC_INDEX
+*
+* :SIMULATION_CHANGED
+*    ACDC::CIRCUIT_CHANGE
+*    GET_LOCAL_TIME   ==>_*nTime
+* ;
+*
+* !!!END-INTERACT
+
+xU2 3 2  AmmeterU2
+
+.subckt AmmeterU2 1 2
+Vam 1 2 dc 0
+.ends
+
+* * !!!BEGIN-INTERACT
+*
+*  ( External state variables )
+*  : Rshunt              ++++f1 ;
+*  : Mode                 ++++i3 ;
+*
+*  ( Internal state variables )
+*  0.0      VARIABLE   r1Volt
+*  0.0      VARIABLE   r1Cur
+*  0         VARIABLE   nTime
+*  0         VARIABLE   nTimeCur
+*
+*
+* .( Loading the voltmeter.. )  cr
+*
+*  :  RESET
+*       0.0  VALUE  SET_ANIMATION_TEXT
+*       Rshunt  SET_INSTANCE Resistor ::R r1 resistance
+*       1   RESET_ACDC
+*       GET_LOCAL_TIME   ==>_*nTime
+*  ;
+*
+*  :BEGIN_PLOT
+*    RESET
+*  ;
+*
+*  :OUT_DATA
+*   GET_INSTANCE Resistor ::R r1 i  ==>_*r1Cur
+*   (( Rshunt  *r1Cur  f.*  )) 1 ADD_ACDC
+*   GET_LOCAL_TIME   ==>_*nTimeCur
+*   *nTimeCur *nTime - 2 >= if
+*   ((if Mode 1 GET_AC 1 GET_DC ))if   VALUE  SET_ANIMATION_TEXT
+*   *nTimeCur   ==>_*nTime
+*  endif
+*  ;
+*
+* :  BEGIN_ANALYSIS 
+*        RESET
+*    ;
+*     1  ACDC::ALLOC_INDEX
+*
+* :SIMULATION_CHANGED
+*    ACDC::CIRCUIT_CHANGE
+*    GET_LOCAL_TIME   ==>_*nTime
+* ;
+*
+*
+* !!!END-INTERACT
+
+xU3 3 0  VoltmeterU3
+
+.subckt voltmeterU3 1 2
+R1 1 2 1e6
+.ends
+
+* * !!!BEGIN-INTERACT
+*
+*  ( External state variables )
+*  : Rshunt              ++++f1 ;
+*  : Mode                 ++++i3 ;
+*
+*  ( Internal state variables )
+*  0.0      VARIABLE   r1Volt
+*  0.0      VARIABLE   r1Cur
+*  0         VARIABLE   nTime
+*  0         VARIABLE   nTimeCur
+*
+*
+* .( Loading the voltmeter.. )  cr
+*
+*  :  RESET
+*       0.0  VALUE  SET_ANIMATION_TEXT
+*       Rshunt  SET_INSTANCE Resistor ::R r1 resistance
+*       1   RESET_ACDC
+*       GET_LOCAL_TIME   ==>_*nTime
+*  ;
+*
+*  :BEGIN_PLOT
+*    RESET
+*  ;
+*
+*  :OUT_DATA
+*   GET_INSTANCE Resistor ::R r1 i  ==>_*r1Cur
+*   (( Rshunt  *r1Cur  f.*  )) 1 ADD_ACDC
+*   GET_LOCAL_TIME   ==>_*nTimeCur
+*   *nTimeCur *nTime - 2 >= if
+*   ((if Mode 1 GET_AC 1 GET_DC ))if   VALUE  SET_ANIMATION_TEXT
+*   *nTimeCur   ==>_*nTime
+*  endif
+*  ;
+*
+* :  BEGIN_ANALYSIS 
+*        RESET
+*    ;
+*     1  ACDC::ALLOC_INDEX
+*
+* :SIMULATION_CHANGED
+*    ACDC::CIRCUIT_CHANGE
+*    GET_LOCAL_TIME   ==>_*nTime
+* ;
+*
+*
+* !!!END-INTERACT
+
+xU4 0 1  VoltmeterU4
+
+.subckt voltmeterU4 1 2
+R1 1 2 1e9
+.ends
+
+.SUBCKT BC264D 10 20 30
+J1 10 20 30 NJF
+.MODEL NJF NJF
++             VTO = -2.3085E+000
++            BETA = 1.09045E-003
++          LAMBDA = 2.31754E-002
++              RD = 7.77648E+000
++              RS = 7.77648E+000
++              IS = 2.59121E-016
++            CGS  = 2.00000E-012
++            CGD  = 2.20000E-012
++              PB = 9.91494E-001
++              FC = 5.00000E-001
+.ENDS
+Rshunt_1 1 0 1e12
+Rshunt_3 3 0 1e12
+Rshunt_2 2 0 1e12

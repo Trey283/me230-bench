@@ -1,0 +1,30 @@
+* Q5HW1 (converted from Multisim)
+rR1 3 4 10 vresR1  
+.model vresR1 r(  )
+
+rR2 1 2 20 vresR2  
+.model vresR2 r(  )
+
+rR3 3 2 5 vresR3  
+.model vresR3 r(  )
+
+rR4 1 0 4 vresR4  
+.model vresR4 r(  )
+
+rR5 2 0 2 vresR5  
+.model vresR5 r(  )
+
+vV1 3 0 dc 12.3 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+xI2 1 4 2 0 IC_I_SourceI2
+.SUBCKT IC_I_SourceI2 1 2 3 4
+v1 2 1 dc 0
+f1 4 3 v1 2
+.ends
+
+Rshunt_3 3 0 1e12
+Rshunt_4 4 0 1e12
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12

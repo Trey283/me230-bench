@@ -1,0 +1,14 @@
+* Tutorial 4 (converted from Multisim)
+vV1 1 0 dc 0 ac 1 0
++      distof1 0 0
++      distof2 0 0
++      sin(0 169.71 60 0 0 0)
+
+rR1 1 2 1k vresR1  
+.model vresR1 r(  )
+
+cC1 2 0 1u 
+
+* scope XSC1
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12

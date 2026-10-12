@@ -1,0 +1,62 @@
+* Design1 (converted from Multisim)
+vV1 4 0 dc 10 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+rR1 4 3 2k vresR1  
+.model vresR1 r(  )
+
+rR2 4 3 3k vresR2  
+.model vresR2 r(  )
+
+rR3 3 2 2k vresR3  
+.model vresR3 r(  )
+
+rR4 3 2 6k vresR4  
+.model vresR4 r(  )
+
+rR5 2 0 3.48k vresR5  
+.model vresR5 r(  )
+
+rR6 2 0 6.98k vresR6  
+.model vresR6 r(  )
+
+XMM1 4 3 XXMM1_307266192
+
+XMM2 3 2 XXMM1_307266192
+
+XMM3 2 0 XXMM1_307266192
+
+vV2 5 0 dc 10 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+rR7 5 1 1.2k vresR7  
+.model vresR7 r(  )
+
+rR8 1 6 1.5k vresR8  
+.model vresR8 r(  )
+
+rR9 6 0 2.31k vresR9  
+.model vresR9 r(  )
+
+XMM4 5 1 XXMM4_307266192
+
+XMM5 1 6 XXMM4_307266192
+
+XMM6 6 0 XXMM4_307266192
+
+.subckt XXMM1_307266192 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM4_307266192 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+Rshunt_4 4 0 1e12
+Rshunt_3 3 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_5 5 0 1e12
+Rshunt_1 1 0 1e12
+Rshunt_6 6 0 1e12

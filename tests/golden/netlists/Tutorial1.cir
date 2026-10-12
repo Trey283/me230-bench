@@ -1,0 +1,57 @@
+* Tutorial1 (converted from Multisim)
+rR1 1 2 1 vresR1  
+.model vresR1 r(  )
+
+rR2 1 3 3 vresR2  
+.model vresR2 r(  )
+
+rR3 2 3 2 vresR3  
+.model vresR3 r(  )
+
+rR4 2 0 3 vresR4  
+.model vresR4 r(  )
+
+rR5 3 0 1 vresR5  
+.model vresR5 r(  )
+
+iI1 0 1 dc 2 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+iI2 0 3 dc 3 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+XMM1 3 0 XXMM1_225319440
+
+XMM2 1 3 XXMM2_225319440
+
+XMM3 2 0 XXMM3_225319440
+
+XMM4 2 3 XXMM4_225319440
+
+XMM5 1 2 XXMM5_225319440
+
+.subckt XXMM1_225319440 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM2_225319440 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM3_225319440 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM4_225319440 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM5_225319440 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_3 3 0 1e12

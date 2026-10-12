@@ -1,0 +1,53 @@
+* HW1Q3 (converted from Multisim)
+rR1 1 2 1k vresR1  
+.model vresR1 r(  )
+
+rR2 2 0 2k vresR2  
+.model vresR2 r(  )
+
+rR3 1 4 4k vresR3  
+.model vresR3 r(  )
+
+rR4 4 0 8k vresR4  
+.model vresR4 r(  )
+
+rR5 2 4 10k vresR5  
+.model vresR5 r(  )
+
+vV1 1 0 dc 5 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+XMM1 4 2 XXMM1_222591640
+
+XMM2 2 0 XXMM2_222591640
+
+XMM3 1 2 XXMM3_222591640
+
+XMM4 1 4 XXMM4_222591640
+
+XMM5 4 0 XXMM5_222591640
+
+.subckt XXMM1_222591640 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM2_222591640 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM3_222591640 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM4_222591640 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+.subckt XXMM5_222591640 2 1 
+I_multi_meter 1 2 DC 0.000000e+00
+R_multi_meter 2 1 1.000000e+09
+.ends
+Rshunt_1 1 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_4 4 0 1e12

@@ -1,0 +1,24 @@
+* controlled current voltage controlled (converted from Multisim)
+rR1 1 4 2 vresR1  
+.model vresR1 r(  )
+
+rR2 2 0 4 vresR2  
+.model vresR2 r(  )
+
+rR3 2 3 6 vresR3  
+.model vresR3 r(  )
+
+vV1 1 0 dc 10 ac 0 0
++           distof1 0 0
++           distof2 0 0
+
+xV2 2 4 3 0 IC_V_SourceV2
+.SUBCKT IC_V_SourceV2 1 2 3 4
+v1 2 1 dc 0
+h1 4 3 v1 4
+.ends
+
+Rshunt_1 1 0 1e12
+Rshunt_4 4 0 1e12
+Rshunt_2 2 0 1e12
+Rshunt_3 3 0 1e12
