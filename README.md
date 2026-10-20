@@ -39,6 +39,9 @@ python3 tests/e2e/test_e2e.py   # the built page in headless Chromium (~6 min)
 ```
 Tests read the course files from `tests/fixtures/ME230` (override with `ME230_FIXTURES=/path`).
 
+## Hosting on Netlify
+`netlify.toml` runs `npm run build`, publishes `dist`, and serves the self-contained bench at the site root. No server-side functions, environment variables or external services are required. In Netlify, use `main` as the production branch and leave build-command/publish-directory overrides blank so the checked-in configuration remains authoritative. The deployed app is public unless access control is enabled in Netlify.
+
 ## Layout
 | Path | What it does |
 |---|---|
