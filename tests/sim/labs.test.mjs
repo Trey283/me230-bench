@@ -7,12 +7,57 @@ import { toNetlist, setAcDrive, meterVectorName } from '../../src/netlist.js';
 import { describe } from '../../src/instruments.js';
 import { bodeFromAc, bodeSummary } from '../../src/analysis.js';
 import { CoSim } from '../../src/cosim.js';
+import { runAnalysis } from '../../src/analysisrun.js';
+import { withDefaults } from '../../src/analyses.js';
 
 const lab = (id) => { const d = LABS.find((l) => l.id === id).build(); const c = toCircuit(d); return { d, c, nl: toNetlist(c, id) }; };
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: got ${a}, want ${b} \u00b1 ${tol}`);
 const run = async (nl, line) => vectors(await (await engine()).run(nl + OPT + line + '\n.end\n'));
 const netOf = (c, ref, pin) => c.comps.find((k) => k.ref === ref).pins[pin];
 const range = (V, net, from) => { const t = V.get('time'), y = V.get(`v(${String(net).toLowerCase()})`); let lo = Infinity, hi = -Infinity; for (let i = 0; i < t.length; i++) if (t[i] >= from) { lo = Math.min(lo, y[i]); hi = Math.max(hi, y[i]); } return [lo, hi]; };
+const analysisExec = async (nl, mid) => { const sp = await engine(), r = await sp.run(nl, mid); return { r, errors: sp.errors.slice() }; };
+const tableRow = (page, name) => page.table.rows.find((r) => r[0] === name);
+
+test('Quiz 2 samples are wired and open with the required analyses', () => {
+  const expected = { 'q2-ac-cap': 'sfac', 'q2-mesh': 'sfac', 'q2-impedance': 'sfac', 'q2-rc-switch': 'interactive', 'q2-rlc-damping': 'param' };
+  for (const [id, active] of Object.entries(expected)) {
+    const { d, c } = lab(id);
+    assert.equal(d.analyses.active, active, id);
+    const loose = c.comps.filter((x) => x.template && Object.values(x.pins).includes('?')).map((x) => x.ref);
+    assert.deepEqual(loose, [], `${id} has unconnected pins`);
+  }
+  const rc = LABS.find((x) => x.id === 'q2-rc-switch').build();
+  assert.equal(rc.analyses.interactive.ic, 'zero'); assert.equal(rc.analyses.tran.tstop, '30'); assert.equal(rc.analyses.tran.tmax, '1e-5');
+  assert.equal(LABS.find((x) => x.id === 'q2-rlc-damping').build().analyses.param.list, '10 100 400 2200');
+});
+
+test('Quiz 2 AC capacitor-current sample matches the worksheet phasor solution', async () => {
+  const { d, c } = lab('q2-ac-cap'), [page] = await runAnalysis({ exec: analysisExec, circuit: c, name: d.name, switches: {}, A: withDefaults(d.analyses), id: 'sfac' });
+  const row = tableRow(page, 'I(C1)');
+  near(+row[2], 2.22e-3, 5e-6, '|Ic|'); near(+row[3], 159.8, 0.2, 'phase Ic');
+});
+
+test('Quiz 2 three-mesh AC sample solves the shared inductor current', async () => {
+  const { d, c } = lab('q2-mesh'), [page] = await runAnalysis({ exec: analysisExec, circuit: c, name: d.name, switches: {}, A: withDefaults(d.analyses), id: 'sfac' });
+  const row = tableRow(page, 'I(L1)');
+  near(+row[2], 1.17, 0.01, '|IL|'); near(+row[3], -46.5, 0.2, 'phase IL');
+});
+
+test('Quiz 2 impedance-reduction sample gives 2.28 at +15.3 degrees', async () => {
+  const { d, c } = lab('q2-impedance'), [page] = await runAnalysis({ exec: analysisExec, circuit: c, name: d.name, switches: {}, A: withDefaults(d.analyses), id: 'sfac' });
+  const row = tableRow(page, 'I(R1)');
+  near(+row[2], 2.28, 0.01, '|I|'); near(+row[3], 15.3, 0.2, 'phase I');
+});
+
+test('Quiz 2 RLC parameter sweep separates underdamped, near-critical and overdamped cases', async () => {
+  const { d, c } = lab('q2-rlc-damping'), rebuild = (ref, val) => { const x = LABS.find((q) => q.id === 'q2-rlc-damping').build(); x.parts.find((p) => p.ref === ref).params.R = String(val); return toCircuit(x); };
+  const [page] = await runAnalysis({ exec: analysisExec, circuit: c, name: d.name, switches: {}, A: withDefaults(d.analyses), id: 'param', rebuild });
+  const traces = page.graphs[0].traces, extrema = traces.map((t) => [Math.min(...t.y), Math.max(...t.y)]);
+  assert.ok(extrema[0][1] > 9 && extrema[0][0] < -4, '10 Ohm rings strongly');
+  assert.ok(extrema[1][1] > 7 && extrema[1][0] < -2, '100 Ohm is underdamped');
+  assert.ok(extrema[2][1] < 5.01 && extrema[2][0] > -0.01, '400 Ohm is near critical');
+  assert.ok(extrema[3][1] <= 5.001 && extrema[3][0] > -1e-3, '2.2 kOhm is overdamped');
+});
 
 test('Lab 2 divider: the multimeter reads 8 V', async () => {
   const { c, nl } = lab('lab2'), V = await run(nl, '.op'), m = describe(c).meters[0];

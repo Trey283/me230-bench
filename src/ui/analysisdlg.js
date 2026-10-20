@@ -29,7 +29,7 @@ export function openAnalysesDialog(ctx, st) {
   function paramsTab(id) {
     const s = work[id];
     if (id === 'interactive') return h('div', {}, h('p', { class: 'note', text: 'Interactive Simulation runs the circuit in real time with its instruments, switches and interactive parts. Run (F5), Pause (F6), Stop.' }),
-      grp('Initial conditions', h('div', { text: 'Determine automatically' })), grp('Instruments', h('div', { class: 'note', text: 'Each instrument keeps its own settings on its front panel (double-click it).' })),
+      grp('Initial conditions', pick(s, 'ic', 'Initial conditions:', [['auto', 'Determine automatically'], ['zero', 'Set to zero (start capacitors and inductors empty)']])), grp('Instruments', h('div', { class: 'note', text: 'Each instrument keeps its own settings on its front panel (double-click it).' })),
       grp('Pacing', chk(ctx.prefs, 'realtime', 'Run in real time (otherwise as fast as possible)')));
     if (id === 'op') return h('p', { class: 'note', text: 'DC Operating Point solves the circuit with capacitors open and inductors shorted, and lists the selected variables. Choose them on the Output tab.' });
     if (id === 'ac') return h('div', {}, grp('Frequency parameters', fld(s, 'fstart', 'Start frequency (FSTART):', 'Hz'), fld(s, 'fstop', 'Stop frequency (FSTOP):', 'Hz'),

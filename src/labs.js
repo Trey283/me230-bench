@@ -1,5 +1,5 @@
-// labs.js — starter circuits for each ME230 lab, built from library parts (grid units of 9 px).
-import { newDoc, addPart, addWire } from './model.js';
+// labs.js — Quiz 2 review circuits and ME230 lab starters, built from library parts (grid units of 9 px).
+import { newDoc, addPart, addWire, connect, toCircuit } from './model.js';
 import { GRID } from './parts.js';
 
 function builder(name, OX = 24, OY = 16) {
@@ -13,6 +13,11 @@ function builder(name, OX = 24, OY = 16) {
 function sourceLeft(at, w, params) { const v = at('funcgen', 0, 4, 0, params); at('ground', 4, 6); w([0, 2], [0, -2]); w([0, 6], [0, 6]); return v; }
 
 export const LABS = [
+  { id: 'q2-ac-cap', title: 'Quiz 2: AC capacitor current and voltage drops', build: quiz2AcCap },
+  { id: 'q2-mesh', title: 'Quiz 2: three-mesh AC circuit', build: quiz2Mesh },
+  { id: 'q2-impedance', title: 'Quiz 2: AC impedance reduction network', build: quiz2Impedance },
+  { id: 'q2-rc-switch', title: 'Quiz 2: switched RC charge/discharge', build: quiz2RcSwitch },
+  { id: 'q2-rlc-damping', title: 'Quiz 2: RLC damping comparison', build: quiz2RlcDamping },
   { id: 'lab2', title: 'Lab 2: voltage divider', build() {
     const { d, at, w } = builder('Lab 2: voltage divider');
     at('dcvoltage', 0, 4, 0, { V: '12' }); at('resistor', 8, 0, 1, { R: '1k' }); at('resistor', 8, 4, 1, { R: '2k' });
@@ -76,6 +81,86 @@ export const LABS = [
   { id: 'ino-stepper', title: 'Arduino: stepper motor and direction button (BareMinimum13)', build: () => stepperLab() },
   { id: 'ino-servo', title: 'Arduino: servo with two push buttons (BareMinimum14)', build: () => servoLab() },
 ];
+
+function note(at, x, y, text, size = '12') { return at('text', x, y, 0, { text, size, color: 'Blue' }); }
+function analysisPreset(d, active, settings) { d.analyses = { active, ...settings }; return d; }
+function voltageAcross(circuit, ref) { const c = circuit.comps.find((x) => x.ref === ref), p = Object.values(c.pins); return `V(${p[0]},${p[1]})`; }
+
+// Review problem 1: Vin = 5 cos(3000t + pi/2), R1 = 1 kOhm, and parallel R2-L / C branches.
+function quiz2AcCap() {
+  const b = builder('Quiz 2: AC capacitor current', 28, 22), { d, at } = b;
+  note(at, 0, -7, 'Problem 1 — Single Frequency AC is ready. Run it to see I(C1) and every component voltage.', '10');
+  const v = at('acvoltage', 0, 4, 0, { A: '5', acm: '5', f: '477.464829', ph: '90' });
+  const r1 = at('resistor', 7, 1, 0, { R: '1k' }), r2 = at('resistor', 13, 4, 1, { R: '3k' });
+  const l = at('inductor', 13, 9, 1, { L: '0.5' }), c = at('capacitor', 21, 6, 1, { C: '0.2u' }), g = at('ground', 7, 13);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', r2, '1'); connect(d, r1, '2', c, '1'); connect(d, r2, '2', l, '1');
+  connect(d, l, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  const circuit = toCircuit(d);
+  return analysisPreset(d, 'sfac', { sfac: { f: '477.464829', format: 'magph', showFreq: true, out: ['I(C1)', ...['R1', 'R2', 'L1', 'C1'].map((ref) => voltageAcross(circuit, ref))] } });
+}
+
+// Review problem 2. At omega = 1000 rad/s, C1 is -j4 Ohm and L1 is +j1 Ohm.
+function quiz2Mesh() {
+  const b = builder('Quiz 2: three-mesh AC circuit', 28, 24), { d, at, w } = b;
+  note(at, 0, -9, 'Problem 2 — phased AC sources and three coupled meshes. Expected I(L1) about 1.17 at -46.5 degrees.', '10');
+  const r1 = at('resistor', 2, 0, 1, { R: '2' }), r2 = at('resistor', 7, 4, 0, { R: '2' }), r3 = at('resistor', 12, 0, 1, { R: '2' });
+  const r4 = at('resistor', 17, 4, 0, { R: '2' }), r5 = at('resistor', 18, 0, 1, { R: '2' }), r6 = at('resistor', 2, 6, 1, { R: '3' });
+  const c = at('capacitor', 2, 11, 1, { C: '0.25m' }), l = at('inductor', 18, 6, 1, { L: '1m' });
+  const va = at('acvoltage', 8, -4, 1, { A: '12', acm: '12', f: '159.154943', ph: '0' });
+  const vb = at('acvoltage', 22, 7, 0, { A: '6', acm: '6', f: '159.154943', ph: '-90' }), g = at('ground', 10, 13);
+  // Nodes follow the reviewed Multisim file: (2-1), (2-5), (4-5), (5-3), (4-7), (2-6).
+  w([5, -4], [2, -4], [2, -2]);                                      // node 1: V1- to R1
+  w([2, 2], [2, 4], [5, 4]);                                         // node 2: R1, R2, R6
+  w([9, 4], [12, 4], [12, 2]); w([12, 4], [15, 4]);                  // node 5: R2, R3, R4
+  w([11, -4], [12, -4], [12, -2]); w([12, -4], [18, -4], [18, -2]); // node 4: V1+, R3, R5
+  w([18, 2], [18, 4]); w([18, 8], [18, 13]);                         // R5-L1 branch
+  w([2, 8], [2, 9]);                                                  // R6-C1 branch
+  w([19, 4], [22, 4]);                                                // node 3: R4, V2+
+  w([2, 13], [22, 13]); w([22, 10], [22, 13]);                       // ground rail
+  return analysisPreset(d, 'sfac', { sfac: { f: '159.154943', format: 'magph', showFreq: true, out: ['I(L1)', 'I(C1)', 'I(R2)', 'I(R3)', 'I(R4)'] } });
+}
+
+// Review problem 3: delta-to-wye style AC network, omega = 10,000 rad/s.
+function quiz2Impedance() {
+  const b = builder('Quiz 2: AC impedance network', 28, 22), { d, at } = b;
+  note(at, 0, -8, 'Problem 3 — Single Frequency AC is ready. Expected source-path current I(R1) about 2.28 at +15.3 degrees.', '10');
+  const v = at('acvoltage', 0, 5, 0, { A: '12', acm: '12', f: '1591.54943', ph: '0' });
+  const r1 = at('resistor', 6, 2, 0, { R: '3' }), l1 = at('inductor', 12, 2, 0, { L: '0.3m' }), l2 = at('inductor', 18, 2, 0, { L: '0.3m' });
+  const c = at('capacitor', 15, -3, 0, { C: '50u' }), r2 = at('resistor', 14, 7, 1, { R: '3' }), r3 = at('resistor', 20, 7, 1, { R: '3' }), g = at('ground', 9, 12);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', l1, '1'); connect(d, l1, '2', l2, '1'); connect(d, l2, '2', r3, '1');
+  connect(d, r1, '2', c, '1'); connect(d, c, '2', l2, '2'); connect(d, l1, '2', r2, '1');
+  connect(d, r2, '2', g, '1'); connect(d, r3, '2', g, '1'); connect(d, v, '2', g, '1');
+  const circuit = toCircuit(d);
+  return analysisPreset(d, 'sfac', { sfac: { f: '1591.54943', format: 'magph', showFreq: true, out: ['I(R1)', ...['C1', 'L1', 'L2'].map((ref) => voltageAcross(circuit, ref))] } });
+}
+
+function quiz2RcSwitch() {
+  const b = builder('Quiz 2: switched RC charge/discharge', 26, 21), { d, at } = b;
+  note(at, 0, -7, 'Problem 4 — Run starts the capacitor at 0 V. Press Space to switch from 10 kOhm charging to 20 kOhm discharging.', '10');
+  note(at, 0, -4, 'tau_charge = 1 s; tau_discharge = 2 s. Transient is also preset for 0–30 s with TMAX = 1e-5 s.', '10');
+  const v = at('dcvoltage', 24, 5, 0, { V: '5' }), r1 = at('resistor', 18, 2, 0, { R: '10k' }), s = at('spdt', 12, 2, 0, { key: 'Space' });
+  const c = at('capacitor', 7, 6, 1, { C: '100u' }), r2 = at('resistor', 13, 8, 1, { R: '20k' }), p = at('mvprobe', 5, 2, 0, { color: 'Red' }), g = at('ground', 13, 13);
+  connect(d, v, '1', r1, '2'); connect(d, r1, '1', s, 'A'); connect(d, s, 'COM', c, '1'); connect(d, s, 'COM', p, '1');
+  connect(d, s, 'B', r2, '1'); connect(d, r2, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'interactive', {
+    interactive: { ic: 'zero' },
+    tran: { ic: 'zero', tstart: '0', tstop: '30', tmaxAuto: false, tmax: '1e-5', tstepAuto: true, tstep: '1e-5', out: ['V(PR1)'] },
+  });
+}
+
+function quiz2RlcDamping() {
+  const b = builder('Quiz 2: RLC damping comparison', 28, 20), { d, at } = b;
+  note(at, 0, -7, 'Problem 8 — Parameter Sweep is ready for R1 = 10, 100, 400, and 2200 Ohm.', '10');
+  note(at, 0, -4, 'For L = 4.7 mH and C = 0.1 uF, exact critical resistance is 433.6 Ohm (the worksheet rounds to 400 Ohm).', '10');
+  const v = at('pulse', 0, 5, 0, { V1: '0', V2: '5', td: '0', tr: '1u', tf: '1u', pw: '2.082333m', per: '4.166667m' });
+  const r = at('resistor', 7, 2, 0, { R: '2.2k' }), l = at('inductor', 13, 2, 0, { L: '4.7m' }), c = at('capacitor', 18, 6, 1, { C: '0.1u' });
+  const p = at('mvprobe', 20, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', r, '1'); connect(d, r, '2', l, '1'); connect(d, l, '2', c, '1'); connect(d, c, '1', p, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'param', {
+    tran: { ic: 'zero', tstart: '0', tstop: '8.333m', tmaxAuto: false, tmax: '1u', tstepAuto: false, tstep: '1u', out: ['V(PR1)'] },
+    param: { device: 'R1', param: 'value', sweep: 'list', start: '10', stop: '2200', points: '4', inc: '', list: '10 100 400 2200', analysis: 'tran', group: true, out: ['V(PR1)'] },
+  });
+}
 
 function opampLab(kind) {
   const { d, at, w } = builder({ buffer: 'Lab 5: buffer', inverting: 'Lab 5: inverting amplifier', noninverting: 'Lab 5: non-inverting amplifier', comparator: 'Lab 5: comparator' }[kind]);

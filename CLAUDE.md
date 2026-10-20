@@ -19,7 +19,7 @@ python3 tests/e2e/test_e2e.py    # in-browser tests, headless Chromium, about 6 
 ```
 - The in-browser tests need `pip install playwright` and `playwright install chromium`.
 - Build first: the in-browser tests load `dist/me230-bench.html`. Screenshots go to `tests/e2e/shots/`.
-- At v1.12 the counts are 69 unit, 78 simulation and 185 in-browser checks. Keep everything passing.
+- At v1.13 the counts are 69 unit, 85 simulation and 192 in-browser checks. Keep everything passing.
 
 ## How the bundle works (read before adding code)
 - `build.mjs` joins the ES modules in a fixed `order` list and strips `import` and `export` lines. It then runs

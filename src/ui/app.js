@@ -444,7 +444,10 @@ async function simRun(st = cur) {
   if (uno) {
     try { run = new CoSim(exec, { netlist: base + OPT, vectors, step, maxPoints: 2e6, uno: { ref: uno.ref, pins: uno.pins }, sketch: st.doc.sketch || '', quantumMs: 50 }); }
     catch (e) { st.sim = null; refreshToolbars(); simLog(st, 'Sketch error: ' + e.message, true); openSketch(st); sketchMsg(e.message, true); status('The Arduino sketch has a problem.', true); return; }
-  } else run = new LiveRun(exec, { netlist: LiveRun.source(base + OPT, vectors, step), vectors, step, maxPoints: 2e6 });
+  } else {
+    const fromRest = analysesOf(st).interactive.ic === 'zero';
+    run = new LiveRun(exec, { netlist: LiveRun.source(base + OPT, vectors, step, fromRest), vectors, step, maxPoints: 2e6 });
+  }
   const map = { get: (k) => (k === 'time' ? run.data.time : run.data[k.toLowerCase()] || null) };
   st.sim = { state: 'run', run, map, step, pending: [], wall0: performance.now(), t0: 0, lastUi: 0, cosim: !!uno, chunk: step * 400 };
   st.scopeView = {};
@@ -1188,11 +1191,14 @@ function globalOptions() {
 }
 function samplesWin() {
   const id = 'samples';
-  WM.open({ id, title: 'Open Samples - ME230 lab circuits', modal: true, body: h('div', { class: 'startcard' },
-    h('p', { class: 'note', text: 'Starter circuits for each ME230 lab. Open one and press Run (F5); double-click an instrument to see its panel.' }),
-    h('div', { class: 'labs' }, ...LABS.filter((l) => !l.id.startsWith('ino-')).map((l) => h('button', { class: 'btn', 'data-lab': l.id, text: l.title, onclick: () => { WM.close(id); openLab(l.id); } }))),
+  const buttons = (pick, trim = '') => h('div', { class: 'labs' }, ...LABS.filter(pick).map((l) => h('button', { class: 'btn', 'data-lab': l.id, text: trim ? l.title.replace(trim, '') : l.title, onclick: () => { WM.close(id); openLab(l.id); } })));
+  WM.open({ id, title: 'Open Samples - ME230 circuits', modal: true, body: h('div', { class: 'startcard' },
+    h('p', { class: 'note', text: 'Quiz 2 review circuits, with the correct analysis and output variables already selected.' }),
+    buttons((l) => l.id.startsWith('q2-'), /^Quiz 2: /),
+    h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'Starter circuits for the ME230 labs. Open one and press Run (F5); double-click an instrument to see its panel.' }),
+    buttons((l) => !l.id.startsWith('q2-') && !l.id.startsWith('ino-')),
     h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'The course’s Arduino sketches (BareMinimum), each on a circuit to run it. MCU » Arduino sketch shows the code and the Serial Monitor.' }),
-    h('div', { class: 'labs' }, ...LABS.filter((l) => l.id.startsWith('ino-')).map((l) => h('button', { class: 'btn', 'data-lab': l.id, text: l.title.replace(/^Arduino: /, ''), onclick: () => { WM.close(id); openLab(l.id); } }))),
+    buttons((l) => l.id.startsWith('ino-'), /^Arduino: /),
     h('div', { class: 'dlgbtns' }, h('button', { class: 'btn', text: 'Close', onclick: () => WM.close(id) }))) });
 }
 function openLab(labId) { const lab = LABS.find((l) => l.id === labId); if (!lab) return; if (untouchedBlank()) { const b = files[0]; files.length = 0; if (cur === b) cur = null; } return addDesign(stateFromDoc(lab.build())); }

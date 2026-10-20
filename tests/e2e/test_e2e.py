@@ -505,18 +505,52 @@ with sync_playwright() as p:
     win(pg, 'Bill of Materials').locator('.wt button[aria-label=Close]').click()
     pg.screenshot(path=str(SHOTS / 'place-menu.png'))
 
-    # ---------------- lab starters and Lab 6 (Arduino) ----------------
+    # ---------------- Quiz 2 review circuits, lab starters and Lab 6 (Arduino) ----------------
     menu(pg, 'File', 'Open samples...')
     labs = pg.eval_on_selector_all('.win [data-lab]', 'bs => bs.map(b => b.dataset.lab)')
     check('File » Open samples lists the ME230 lab starters', len(labs) >= 12 and 'lab6' in labs, str(labs))
+    q2 = [x for x in labs if x.startswith('q2-')]
+    check('Open samples lists all five Quiz 2 review circuits', q2 == ['q2-ac-cap', 'q2-mesh', 'q2-impedance', 'q2-rc-switch', 'q2-rlc-damping'], str(q2))
     pg.keyboard.press('Escape')
     bad = []
-    for lab in [l for l in labs if l != 'lab6']:
+    for lab in [l for l in labs if l != 'lab6' and not l.startswith('q2-')]:
         pg.evaluate('id => window.__bench.openLab(id)', lab); pg.wait_for_timeout(100)
         run(pg, 0.4)
         if 'Simulating' not in msg(pg) or pg.locator('#sch .part').count() < 3: bad.append(f'{lab}: {msg(pg)}')
         stop(pg)
     check('every lab starter opens and simulates', not bad, '; '.join(bad))
+
+    def q2_table(lab):
+        pg.evaluate('id => window.__bench.openLab(id)', lab); pg.wait_for_timeout(150)
+        an_run()
+        rows = pg.evaluate("() => window.__bench.current().grapher.pages.at(-1).table.rows")
+        win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
+        return {r[0]: r[1:] for r in rows}
+
+    pg.evaluate("() => window.__bench.openLab('q2-ac-cap')"); pg.wait_for_timeout(150)
+    check('Quiz 2 samples open with their required analysis selected', pg.input_value('select[aria-label="Active analysis"]') == 'sfac')
+    an_run()
+    rows = pg.evaluate("() => window.__bench.current().grapher.pages.at(-1).table.rows")
+    ic = next(r for r in rows if r[0] == 'I(C1)')
+    check('Quiz 2 problem 1: F5 gives I(C) = 2.22 mA at 159.8°', abs(float(ic[2]) - 2.22e-3) < 5e-6 and abs(float(ic[3]) - 159.8) < 0.2, str(ic))
+    win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
+    il = q2_table('q2-mesh')['I(L1)']
+    check('Quiz 2 problem 2: the three-mesh circuit gives I(L) = 1.17 A at -46.5°', abs(float(il[1]) - 1.17) < 0.01 and abs(float(il[2]) + 46.5) < 0.2, str(il))
+    iz = q2_table('q2-impedance')['I(R1)']
+    check('Quiz 2 problem 3: the impedance network gives I = 2.28 A at +15.3°', abs(float(iz[1]) - 2.28) < 0.01 and abs(float(iz[2]) - 15.3) < 0.2, str(iz))
+
+    pg.evaluate("() => window.__bench.openLab('q2-rc-switch')"); pg.wait_for_timeout(150)
+    run(pg, 0.2)
+    zero_ic = pg.evaluate("() => { const st = window.__bench.current(); return st.doc.analyses.interactive.ic === 'zero' && /\\buic\\b/.test(st.sim.run.netlist); }")
+    check('Quiz 2 problem 4: interactive Run starts the capacitor empty', zero_ic)
+    stop(pg)
+
+    pg.evaluate("() => window.__bench.openLab('q2-rlc-damping')"); pg.wait_for_timeout(150)
+    an_run()
+    damp = pg.evaluate("""() => window.__bench.current().grapher.pages.at(-1).graphs[0].traces.map(t => ({ name: t.name, lo: Math.min(...t.y), hi: Math.max(...t.y) }))""")
+    check('Quiz 2 problem 8: F5 plots underdamped through overdamped RLC cases', len(damp) == 4 and damp[0]['hi'] > 9 and damp[0]['lo'] < -4 and damp[2]['hi'] < 5.01 and damp[2]['lo'] > -0.01 and damp[3]['hi'] <= 5.001 and damp[3]['lo'] > -1e-3, str(damp))
+    win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
+
     pg.evaluate("() => window.__bench.openLab('lab6')"); pg.wait_for_timeout(200)
     menu(pg, 'MCU', 'Arduino sketch...')
     check('Lab 6: MCU » Arduino sketch opens the sketch', 'digitalRead' in pg.input_value('#sketch'), str(wins(pg)))

@@ -18,6 +18,11 @@ test('a live run streamed in small slices matches one batch transient', async ()
   near(T.at(-1), 0.1, 2 * step, 'reached the end');
   for (const t of [0.013, 0.047, 0.081, 0.0995]) near(interp(T, L.data['v(3)'], t), interp(B.get('time'), B.get('v(3)'), t), 0.05, `v(3) at ${t}`);
 });
+
+test('interactive simulation can start capacitors and inductors from zero', () => {
+  assert.match(LiveRun.source('* circuit\n', ['v(1)'], 1e-4, true), /\.tran 0\.0001 1e9 0 0\.0001 uic/);
+  assert.doesNotMatch(LiveRun.source('* circuit\n', ['v(1)'], 1e-4), /\buic\b/);
+});
 test('flipping a switch during a live run gives the right transient', async () => {
   const nl = netlistOf('HW2Q4', { switches: { S1: false } }) + OPT, vec = ['v(3)'];
   const L = new LiveRun(exec, { netlist: LiveRun.source(nl, vec, 0.005), vectors: vec, step: 0.005 });

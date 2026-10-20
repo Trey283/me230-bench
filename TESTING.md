@@ -1,6 +1,15 @@
 # Test report
 
-**v1.12 (loop 9: Tektronix TDS 2024 oscilloscope, Distortion analyzer, Spectrum analyzer): 332 tests, all passing.** 69 unit, 78 simulation, 185 in-browser.
+**v1.13 (loop 10: Quiz 2 review circuits): 346 tests, all passing.** 69 unit, 85 simulation, 192 in-browser.
+
+## Added in v1.13
+**Quiz 2 samples (`tests/sim/labs.test.mjs`, 5 tests):** five ready-wired samples reproduce the review sheet: the capacitor current is 2.22 mA at 159.8°, the shared inductor in the three-mesh circuit carries 1.17 A at −46.5°, and the impedance network draws 2.28 A at +15.3°. The switched 100 µF RC circuit is preset to start empty, charge through 10 kΩ (τ = 1 s), discharge through 20 kΩ (τ = 2 s), and run a 0–30 s transient. The RLC parameter sweep separates the 10 Ω and 100 Ω underdamped responses, the worksheet's near-critical 400 Ω response (exact critical resistance 433.6 Ω), and the overdamped 2.2 kΩ response.
+
+**Simulation support (+2):** library AC voltage and current sources now keep their entered magnitude and phase in AC analyses; Interactive Simulation has a start-from-zero option that emits `uic`, matching a circuit whose power is switched on with empty energy storage.
+
+**Browser (+7):** Open Samples lists all five Quiz 2 circuits; each keeps its required active analysis; pressing F5 reproduces all three phasor answers in the Grapher, starts the RC capacitor empty, and plots all four RLC damping traces with the expected overshoot/ringing separation.
+
+## v1.12 (loop 9: Tektronix TDS 2024 oscilloscope, Distortion analyzer, Spectrum analyzer): 332 tests
 
 ## Added in v1.12
 **Unit (`tests/unit/tektronix.test.mjs`, 4 tests):** SEC/DIV steps 1-2.5-5 and VOLTS/DIV 1-2-5 (and rounding to the nearest step); the MEASURE types in the TDS order, Cyc RMS over one whole period of a 1 V + 2 Vpk sine (√3 V); DEFAULT SETUP (CH1 on, 1 V/div, 500 µs/div, CH1 rising 0 V, Auto); channels 1-4 measured against G with T as the external trigger.

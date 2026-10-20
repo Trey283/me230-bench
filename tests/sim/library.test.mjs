@@ -63,6 +63,13 @@ test('AC power is specified in RMS; AC voltage in peak', async () => {
   }
 });
 
+test('AC analysis sources preserve their magnitude and phase', async () => {
+  const { nl, net } = circuit([['V', 'acvoltage', 0, 0, { A: '5', acm: '3', f: '1k', ph: '90' }], ['R', 'resistor', 108, 0, { R: '1k' }, 1], ['G', 'ground', 0, 108]],
+    [['V', '1', 'R', '1'], ['R', '2', 'G', '1'], ['V', '2', 'G', '1']]);
+  const A = vectors(await (await engine()).run(nl + OPT + '.ac lin 1 1k 1k\n.end\n')), z = A.get(`v(${net('R', '1').toLowerCase()})`)[0];
+  near(z.real, 0, 1e-9, 'real part'); near(z.img, 3, 1e-9, 'imaginary part');
+});
+
 test('transformer 2:1 halves the voltage; bridge rectifier gives a full-wave output two diode drops down', async () => {
   const { nl, net } = circuit([['V', 'acvoltage', 0, 0, { A: '20', f: '60' }], ['T', 'transformer', 108, 0, { N: '2' }], ['B', 'bridge', 252, 0], ['R', 'resistor', 252, 108, { R: '1k' }], ['G', 'ground', 0, 108], ['G2', 'ground', 288, 144]],
     [['V', '1', 'T', 'p1'], ['V', '2', 'T', 'p2'], ['V', '2', 'G', '1'], ['T', 's1', 'B', 'AC1'], ['T', 's2', 'B', 'AC2'], ['B', '+', 'R', '1'], ['B', '-', 'R', '2'], ['R', '2', 'G2', '1']]);

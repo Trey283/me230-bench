@@ -17,6 +17,7 @@ export const analysisLabel = (id) => (ANALYSES.find((a) => a.id === id) || { lab
 export function defaultAnalyses() {
   return {
     active: 'interactive',
+    interactive: { ic: 'auto' },
     op: { out: [] },
     ac: { fstart: '1', fstop: '10G', sweep: 'dec', points: '10', vscale: 'log', out: [] },
     tran: { ic: 'auto', tstart: '0', tstop: '1m', tmaxAuto: true, tmax: '1e-05', tstepAuto: true, tstep: '1e-05', out: [] },
