@@ -21,6 +21,9 @@ import { dmmValue, dmmFormat } from '../agilentinst.js';
 import { openWattmeter, openCounter, openClamp, openIV, ivSettings, openDistortion, openSpectrum } from './benchpanels.js';
 import { ivBuild, ivParse, wattReading, counterReading } from '../benchinst.js';
 import { LABS } from '../labs.js';
+import { MEMORY_LIMITS, memoryNewId, memoryJsonBytes, memoryListCircuits, memoryGetCircuit, memoryDeleteCircuit, memoryPutCircuit,
+  memoryGetSetting, memorySetSetting, memoryDeleteSetting, memoryGenerateCode, memoryFormatCode, memoryNewLocker, memoryUpsertLockerDesign,
+  memoryRemoveLockerDesign, memoryCreateVault, memoryLoadVault, memorySaveVault, memoryDeleteVault } from '../storage.js';
 import { newDoc, fromImported, toCircuit, toDrawing, addPart, rotatePart, rotatePartCCW, flipPart, deletePart, deleteWire, addWire, snap,
   moveSelection, copySelection, pasteClip, partBox, replacePart, nextRef, insertInline, connect } from '../model.js';
 import { toNetlist, timeScales, meterVectorName, setAcDrive, num } from '../netlist.js';
@@ -71,9 +74,10 @@ function statusHint(msg) { status(msg); clearTimeout(hintTimer); hintTimer = set
 
 /* ---------- designs ---------- */
 const files = []; let cur = null, seq = 1, designNo = 1;
-function stateFromDoc(doc, xml = '') {
+function stateFromDoc(doc, xml = '', memory = {}) {
   const st = { id: seq++, name: doc.name, xml, doc, undo: [], redo: [], view: null, sel: { parts: new Set(), wires: new Set() }, sw: {}, dirty: false,
-    sim: null, last: null, op: null, log: [], results: [], bode: {}, scopeView: {}, saved: {}, reopen: [] };
+    sim: null, last: null, op: null, log: [], results: [], bode: {}, scopeView: {}, saved: {}, reopen: [],
+    memoryId: memory.id || memoryNewId(), memoryCloud: !!memory.cloud, memorySavedAt: memory.updated || null, memoryTimer: null, cloudTimer: null };
   refreshCircuit(st);
   return st;
 }
@@ -238,7 +242,7 @@ function restore(st, snap) { const o = JSON.parse(snap); st.doc.parts = o.parts;
 const undo = () => { const st = cur; if (st && st.undo.length) { st.redo.push(snapshot(st)); restore(st, st.undo.pop()); } };
 const redo = () => { const st = cur; if (st && st.redo.length) { st.undo.push(snapshot(st)); restore(st, st.redo.pop()); } };
 const clearSel = (st) => { st.sel = { parts: new Set(), wires: new Set() }; };
-function markDirty(st) { if (!st.dirty) { st.dirty = true; renderTabs(); renderToolbox(); } }
+function markDirty(st) { if (!st.dirty) { st.dirty = true; renderTabs(); renderToolbox(); } scheduleMemorySave(st); }
 function afterEdit(st) {
   if (st.sim) simStop(st);
   st.edits = (st.edits || 0) + 1;   // results from before this edit no longer belong to the nets (probe readouts clear)
@@ -1210,7 +1214,8 @@ function helpWin() {
     <p><b>Simulating.</b> Simulate » Run (F5) starts the interactive simulation; Pause (F6) and Stop are next to it. Double-click an instrument to open its front panel. Switches flip with their key (Space unless the switch says otherwise) or a click while the simulation runs.</p>
     <p><b>Analyses.</b> Simulate » Analyses and simulation picks the active analysis (DC Operating Point, AC Sweep, Transient, DC Sweep, Single Frequency AC, Parameter Sweep, Fourier, Temperature Sweep, Transfer Function or your own SPICE lines). Choose what to plot on the Output tab, then Run; the active analysis is also on the Simulation toolbar, and F5 runs it. Results open in the Grapher View: one tab per run, cursors with a readout window, drag a box or use the wheel to zoom, double-click to restore, right-click for Go to next Y_MAX/Y_MIN and Properties, File » Export to CSV.</p>
     <p><b>Panning and zooming.</b> The mouse wheel zooms (Options » Global options switches it to scrolling); middle-drag, Space+drag or two fingers pan.</p>
-    <p><b>Files.</b> File » Open reads Multisim .ms14 files and circuits saved here (.json). File » Save writes a .json file.</p>` }) });
+    <p><b>Files.</b> File » Open reads Multisim .ms14 files and circuits saved here (.json). File » Save writes a .json file.</p>
+    <p><b>Guest memory.</b> Edits are automatically kept in this browser under File » Recent circuits &amp; Guest Memory. You can optionally create an encrypted online Guest Locker and save its recovery code to return from another device. Keep downloading .json files for important work.</p>` }) });
 }
 
 /* ---------- save / open .json ---------- */
@@ -1227,6 +1232,7 @@ function readSavedDoc(text, fname) {
   if (typeof d.sketch === 'string') doc.sketch = d.sketch;
   if (Array.isArray(d.netTexts)) doc.netTexts = d.netTexts;
   if (d.prefs && typeof d.prefs === 'object') doc.prefs = d.prefs;
+  if (d.analyses && typeof d.analyses === 'object') doc.analyses = d.analyses;
   return doc;
 }
 const dlReady = (window.claude && typeof window.claude.use === 'function') ? Promise.resolve().then(() => window.claude.use('downloads')).catch(() => null) : Promise.resolve(null);
@@ -1250,8 +1256,156 @@ async function saveDoc(st = cur) {
 function saveAs() {
   const st = cur; if (!st) return; const id = 'saveas', inp = h('input', { class: 'fld', value: st.name, 'aria-label': 'File name', style: { width: '260px' } });
   WM.open({ id, title: 'Save As', modal: true, body: h('div', {}, h('div', { class: 'row' }, h('label', { text: 'File name:' }), inp, h('span', { text: '.me230.json' })),
-    h('div', { class: 'dlgbtns' }, h('button', { class: 'btn def', text: 'Save', onclick: () => { const n = inp.value.trim(); if (n) { st.name = n; st.doc.name = n; } WM.close(id); saveDoc(st); } }), h('button', { class: 'btn', text: 'Cancel', onclick: () => WM.close(id) }))) });
+    h('div', { class: 'dlgbtns' }, h('button', { class: 'btn def', text: 'Save', onclick: () => { const n = inp.value.trim(); if (n) { st.name = n; st.doc.name = n; scheduleMemorySave(st, 0); } WM.close(id); saveDoc(st); } }), h('button', { class: 'btn', text: 'Cancel', onclick: () => WM.close(id) }))) });
 }
+
+/* ---------- guest memory: local recovery + optional encrypted Netlify locker ---------- */
+let memoryVaultCode = null, memoryVault = null, memoryVaultRevision = null, memoryVaultCodeLoaded = false, memoryVaultLoading = null;
+const memorySavedText = (st) => ({ format: 'me230-bench', version: 2, saved: new Date().toISOString(), doc: st.doc });
+function scheduleMemorySave(st, delay = 800) {
+  if (!st) return;
+  clearTimeout(st.memoryTimer);
+  st.memoryTimer = setTimeout(() => memoryPersistState(st), delay);
+}
+async function memoryPersistState(st) {
+  if (!st || !files.includes(st)) return null;
+  clearTimeout(st.memoryTimer); st.memoryTimer = null;
+  try {
+    const row = await memoryPutCircuit({ id: st.memoryId, name: st.name, updated: new Date().toISOString(), doc: st.doc, cloud: st.memoryCloud });
+    st.memorySavedAt = row.updated; st.memoryProblem = null;
+    if (st.memoryCloud) { clearTimeout(st.cloudTimer); st.cloudTimer = setTimeout(() => memorySyncState(st).catch(() => {}), 2200); }
+    return row;
+  } catch (e) { st.memoryProblem = e.message; return null; }
+}
+async function memoryLoadCode() {
+  if (!memoryVaultCodeLoaded) { memoryVaultCodeLoaded = true; memoryVaultCode = await memoryGetSetting('vaultCode').catch(() => null); }
+  return memoryVaultCode;
+}
+async function memoryEnsureVault(force = false) {
+  const code = await memoryLoadCode();
+  if (!code) return null;
+  if (memoryVault && !force) return memoryVault;
+  if (!memoryVaultLoading) memoryVaultLoading = memoryLoadVault(code).then((r) => { memoryVault = r.locker; memoryVaultRevision = r.revision; return memoryVault; }).finally(() => { memoryVaultLoading = null; });
+  return memoryVaultLoading;
+}
+async function memorySyncState(st) {
+  clearTimeout(st.cloudTimer); st.cloudTimer = null;
+  const code = await memoryLoadCode();
+  if (!code) return;
+  try {
+    await memoryEnsureVault();
+    let next = memoryUpsertLockerDesign(memoryVault, { id: st.memoryId, name: st.name, updated: new Date().toISOString(), doc: st.doc });
+    try {
+      const saved = await memorySaveVault(code, next, memoryVaultRevision); memoryVault = next; memoryVaultRevision = saved.revision;
+    } catch (e) {
+      if (e.status !== 409) throw e;
+      await memoryEnsureVault(true);
+      next = memoryUpsertLockerDesign(memoryVault, { id: st.memoryId, name: st.name, updated: new Date().toISOString(), doc: st.doc });
+      const saved = await memorySaveVault(code, next, memoryVaultRevision); memoryVault = next; memoryVaultRevision = saved.revision;
+    }
+    st.memoryCloud = true; st.memoryProblem = null;
+  } catch (e) { st.memoryProblem = e.message; throw e; }
+}
+const memoryWhen = (value) => { try { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)); } catch { return value || ''; } };
+const memorySize = (bytes) => bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;
+function memoryOpenItem(item, cloud = false) {
+  const doc = readSavedDoc(JSON.stringify({ format: 'me230-bench', version: 2, doc: item.doc }), `${item.name}.me230.json`);
+  const st = stateFromDoc(doc, '', { id: item.id, cloud, updated: item.updated });
+  if (untouchedBlank()) { const b = files[0]; files.length = 0; if (cur === b) cur = null; }
+  addDesign(st); return st;
+}
+function memoryDownloadItem(item) {
+  return saveFile(`${String(item.name || 'circuit').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'circuit'}.me230.json`, JSON.stringify({ format: 'me230-bench', version: 2, saved: item.updated, doc: item.doc }));
+}
+async function memoryCopy(text) {
+  try { await navigator.clipboard.writeText(text); statusHint('Recovery code copied.'); }
+  catch { const x = h('textarea', { style: { position: 'fixed', left: '-9999px' } }); x.value = text; document.body.append(x); x.select(); document.execCommand('copy'); x.remove(); statusHint('Recovery code copied.'); }
+}
+function memoryRecoveryDialog() {
+  const id = 'memory-restore', input = h('input', { class: 'fld memory-code-input', placeholder: 'ME230-XXXX-XXXX-XXXX-XXXX-XXXX', 'aria-label': 'Recovery code', autocomplete: 'off', spellcheck: 'false' });
+  const error = h('p', { class: 'err', role: 'alert' });
+  const restore = async () => {
+    error.textContent = '';
+    try {
+      const code = memoryFormatCode(input.value), loaded = await memoryLoadVault(code);
+      memoryVaultCode = code; memoryVaultCodeLoaded = true; memoryVault = loaded.locker; memoryVaultRevision = loaded.revision;
+      await memorySetSetting('vaultCode', code); WM.close(id); memoryWin(true);
+    } catch (e) { error.textContent = e.message; }
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') restore(); });
+  WM.open({ id, title: 'Restore Guest Locker', modal: true, body: h('div', { class: 'memory-restore' },
+    h('p', { text: 'Enter the recovery code you saved. The locker is decrypted only in this browser.' }), input, error,
+    h('div', { class: 'dlgbtns' }, h('button', { class: 'btn def', text: 'Restore', onclick: restore }), h('button', { class: 'btn', text: 'Cancel', onclick: () => WM.close(id) }))) });
+}
+function memoryHistoryWin(item) {
+  const id = `memory-history:${item.id}`, snaps = item.snapshots || [];
+  WM.open({ id, title: `${item.name} - Recovery snapshots`, w: 520, body: h('div', {},
+    h('p', { class: 'note', text: 'The locker keeps the three previous versions automatically.' }),
+    snaps.length ? h('div', { class: 'memory-list' }, ...snaps.map((snap, i) => h('div', { class: 'memory-row' },
+      h('div', { class: 'memory-main' }, h('b', { text: `Version ${i + 1}` }), h('small', { text: memoryWhen(snap.updated) })),
+      h('div', { class: 'memory-actions' }, h('button', { class: 'btn', text: 'Open', onclick: () => memoryOpenItem({ ...item, doc: snap.doc, updated: snap.updated }, true) }), h('button', { class: 'btn', text: 'Download', onclick: () => memoryDownloadItem({ ...item, doc: snap.doc, updated: snap.updated }) })))))
+      : h('p', { text: 'No earlier versions yet.' }),
+    h('div', { class: 'dlgbtns' }, h('button', { class: 'btn', text: 'Close', onclick: () => WM.close(id) }))) });
+}
+async function memoryCreateLocker() {
+  const code = memoryGenerateCode(), locker = memoryNewLocker(), created = await memoryCreateVault(code, locker);
+  memoryVaultCode = code; memoryVaultCodeLoaded = true; memoryVault = locker; memoryVaultRevision = created.revision;
+  await memorySetSetting('vaultCode', code);
+  if (cur) { cur.memoryCloud = true; await memoryPersistState(cur); await memorySyncState(cur); }
+  return code;
+}
+async function memoryWin(force = false) {
+  const id = 'memory';
+  if (WM.isOpen(id) && !force) { WM.focus(id); return; }
+  if (WM.isOpen(id)) WM.close(id);
+  const root = h('div', { class: 'memory' }, h('p', { class: 'note', text: 'Loading guest memory…' }));
+  WM.open({ id, title: 'Recent Circuits & Guest Memory', w: 720, h: 580, resizable: true, body: root });
+  const renderMemory = async () => {
+    root.textContent = '';
+    let local = [], localError = null, cloudError = null;
+    try { local = await memoryListCircuits(); } catch (e) { localError = e.message; }
+    const total = local.reduce((n, x) => n + (x.size || memoryJsonBytes(x.doc)), 0);
+    const localList = h('div', { class: 'memory-list' });
+    if (localError) localList.append(h('p', { class: 'err', text: localError }));
+    else if (!local.length) localList.append(h('p', { class: 'memory-empty', text: 'No recent circuits yet. Your edits will appear here automatically.' }));
+    for (const item of local) localList.append(h('div', { class: 'memory-row' },
+      h('div', { class: 'memory-main' }, h('b', { text: item.name }), h('small', { text: `${memoryWhen(item.updated)} · ${memorySize(item.size || memoryJsonBytes(item.doc))}${item.cloud ? ' · Guest Locker' : ''}` })),
+      h('div', { class: 'memory-actions' }, h('button', { class: 'btn', text: 'Open', onclick: () => memoryOpenItem(item, !!item.cloud) }), h('button', { class: 'btn', text: 'Download', onclick: () => memoryDownloadItem(item) }),
+        h('button', { class: 'btn', text: 'Delete', onclick: async () => { if (await message('Delete recent circuit?', `${item.name} will be removed from this browser. Download it first if you need a file copy.`, [{ label: 'Delete', value: 'yes' }, { label: 'Cancel', value: 'no', def: true }]) === 'yes') { await memoryDeleteCircuit(item.id); renderMemory(); } } }))));
+    root.append(h('section', { class: 'memory-card' }, h('div', { class: 'memory-heading' }, h('div', {}, h('h2', { text: 'This browser' }), h('p', { class: 'note', text: 'Automatic recovery copies stored on this device. Downloading a file is still the safest long-term copy.' })), h('span', { class: 'memory-usage', text: `${local.length}/${MEMORY_LIMITS.designs} circuits · ${memorySize(total)}/5 MB` })), localList));
+
+    let code = null;
+    try { code = await memoryLoadCode(); if (code) await memoryEnsureVault(); } catch (e) { cloudError = e.message; }
+    const cloudCard = h('section', { class: 'memory-card' }, h('div', { class: 'memory-heading' }, h('div', {}, h('h2', { text: 'Online Guest Locker' }), h('p', { class: 'note', text: 'Optional end-to-end encrypted backup. No account, name, or email is required.' })), h('span', { class: 'memory-badge', text: code ? 'Connected' : 'Optional' })));
+    if (!code) {
+      const err = h('p', { class: 'err', role: 'alert' });
+      cloudCard.append(h('p', { text: 'Use a recovery code to return to your circuits from another browser. Lockers hold 10 circuits, up to 4 MB total, and expire after 180 days without use.' }), err,
+        h('div', { class: 'memory-actions' }, h('button', { class: 'btn def', text: 'Create Guest Locker', onclick: async () => { try { await memoryCreateLocker(); renderMemory(); } catch (e) { err.textContent = e.message; } } }), h('button', { class: 'btn', text: 'Restore with code', onclick: memoryRecoveryDialog })));
+    } else {
+      const codeText = memoryFormatCode(code), err = h('p', { class: 'err', text: cloudError || '' });
+      cloudCard.append(h('p', { text: 'Save this recovery code somewhere private. It is the only way to open this locker on another device.' }),
+        h('div', { class: 'memory-code', text: codeText }), h('div', { class: 'memory-actions' }, h('button', { class: 'btn', text: 'Copy code', onclick: () => memoryCopy(codeText) }),
+          h('button', { class: 'btn', text: 'Download code', onclick: () => saveFile('ME230-Guest-Locker-Recovery-Code.txt', `${codeText}\n\nOpen ${location.origin || 'the hosted ME230 Bench'} and choose File > Recent circuits & Guest Memory > Restore with code.\n`) }),
+          h('button', { class: 'btn def', text: 'Back up current', disabled: !cur || !!cloudError, onclick: async () => { try { cur.memoryCloud = true; await memoryPersistState(cur); await memorySyncState(cur); renderMemory(); } catch (e) { err.textContent = e.message; } } }),
+          h('button', { class: 'btn', text: 'Refresh', onclick: async () => { memoryVault = null; try { await memoryEnsureVault(true); renderMemory(); } catch (e) { err.textContent = e.message; } } })), err);
+      const list = h('div', { class: 'memory-list' });
+      const designs = memoryVault?.designs || [];
+      if (!designs.length && !cloudError) list.append(h('p', { class: 'memory-empty', text: 'This locker has no backed-up circuits yet.' }));
+      for (const item of designs) list.append(h('div', { class: 'memory-row' },
+        h('div', { class: 'memory-main' }, h('b', { text: item.name }), h('small', { text: `${memoryWhen(item.updated)} · ${memorySize(memoryJsonBytes(item.doc))} · ${(item.snapshots || []).length} earlier version(s)` })),
+        h('div', { class: 'memory-actions' }, h('button', { class: 'btn', text: 'Open', onclick: async () => { memoryOpenItem(item, true); await memoryPutCircuit({ id: item.id, name: item.name, updated: item.updated, doc: item.doc, cloud: true }); } }),
+          h('button', { class: 'btn', text: 'Download', onclick: () => memoryDownloadItem(item) }), h('button', { class: 'btn', text: 'History', disabled: !(item.snapshots || []).length, onclick: () => memoryHistoryWin(item) }),
+          h('button', { class: 'btn', text: 'Delete', onclick: async () => { if (await message('Delete locker circuit?', `${item.name} and its recovery snapshots will be removed from the Guest Locker.`, [{ label: 'Delete', value: 'yes' }, { label: 'Cancel', value: 'no', def: true }]) === 'yes') { try { const next = memoryRemoveLockerDesign(memoryVault, item.id), saved = await memorySaveVault(code, next, memoryVaultRevision); memoryVault = next; memoryVaultRevision = saved.revision; renderMemory(); } catch (e) { err.textContent = e.message; } } } }))));
+      cloudCard.append(list, h('div', { class: 'memory-foot' }, h('button', { class: 'btn', text: 'Disconnect this browser', onclick: async () => { await memoryDeleteSetting('vaultCode'); memoryVaultCode = null; memoryVault = null; memoryVaultRevision = null; renderMemory(); } }),
+        h('button', { class: 'btn danger', text: 'Delete entire locker', onclick: async () => { if (await message('Delete the entire Guest Locker?', 'All online circuits and recovery snapshots will be permanently deleted. Local browser copies are not affected.', [{ label: 'Delete locker', value: 'yes' }, { label: 'Cancel', value: 'no', def: true }]) === 'yes') { try { await memoryDeleteVault(code); await memoryDeleteSetting('vaultCode'); memoryVaultCode = null; memoryVault = null; memoryVaultRevision = null; renderMemory(); } catch (e) { err.textContent = e.message; } } } })));
+    }
+    root.append(cloudCard, h('p', { class: 'memory-privacy', text: 'Privacy: circuit names and contents are encrypted before upload. Netlify receives only a separate one-way-derived locker token and stores ciphertext, timestamps, and a revision number—not your recovery code or encryption key.' }));
+  };
+  await renderMemory();
+}
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') files.forEach((st) => memoryPersistState(st)); });
+window.addEventListener('pagehide', () => files.forEach((st) => memoryPersistState(st)));
 function saveScope(st, part) {
   const D = simData(st); if (!D) { statusHint('Run the simulation first.'); return; }
   const desc = st.d.scopes.find((s) => s.ref === part.ref), t = D.map.get('time'), cols = desc.channels.map((c) => [c.name, diffSeries(D.map, c.net, c.ref)]);
@@ -1350,7 +1504,7 @@ const pauseOrResume = () => (cur && cur.sim && cur.sim.state === 'pause' ? simRe
 const MENUS = [
   { label: 'File', items: [
     { label: 'New', key: 'Ctrl+N', icon: 'new', action: blankDesign }, { label: 'Open...', key: 'Ctrl+O', icon: 'open', action: openDialog },
-    { label: 'Open samples...', icon: 'sample', action: samplesWin }, { sep: true },
+    { label: 'Open samples...', icon: 'sample', action: samplesWin }, { label: 'Recent circuits & Guest Memory...', action: memoryWin }, { sep: true },
     { label: 'Close', action: () => cur && closeDesign(cur) }, { label: 'Close all', action: async () => { for (const f of [...files]) await closeDesign(f); } }, { sep: true },
     { label: 'Save', key: 'Ctrl+S', icon: 'save', action: () => saveDoc() }, { label: 'Save as...', key: 'Ctrl+Shift+S', action: saveAs },
     { label: 'Save all', action: async () => { for (const f of files) if (f.dirty) await saveDoc(f); } }, { sep: true },
@@ -1463,8 +1617,10 @@ blankDesign();
 renderSpreadsheet();
 refreshToolbars();
 setInterval(refreshToolbars, 500);
+memoryListCircuits().then((rows) => { if (rows.length) memoryWin(); }).catch(() => {});
 // exposed for automated browser tests only
 window.__bench = { files: () => files, current: () => cur, ctx, openLab, simRun, simStop, simPause, startPlacing, LABS,
+  memoryWin, memoryListCircuits, memoryGetCircuit, memoryPersistState,
   addPart: (type, x, y, params = {}, rot = 0) => { const st = cur; commit(st); const p = addPart(st.doc, type, x, y); Object.assign(p.params, params); p.rot = rot; afterEdit(st); return p.ref; },
   connect: (a, ap, b, bp) => { const st = cur, P = (r) => st.doc.parts.find((p) => p.ref === r); commit(st); connect(st.doc, P(a), ap, P(b), bp); afterEdit(st); },
   openPart: (ref) => { const st = cur, p = st.doc.parts.find((x) => x.ref === ref); if (p) openPart(st, p); } };

@@ -1,5 +1,15 @@
 # Test report
 
+**v1.14 (guest memory and encrypted online lockers): 354 tests, all passing.** 74 unit, 85 simulation, 195 in-browser.
+
+## Added in v1.14
+
+**Guest memory (`src/storage.js`, 5 unit tests):** edited circuits are automatically stored in IndexedDB with 10-circuit, 500 KB-per-circuit and 5 MB browser limits. Recovery codes carry about 100 bits of randomness, accept common O/0 and I/L/1 typing mistakes, and derive an AES-256-GCM key entirely in the browser. A separate 256-bit lookup token—not the recovery code—is sent to the API. Online lockers keep three prior versions per circuit, reject an eleventh circuit, and cap encrypted plaintext at 4 MB so its encoded request remains within Netlify's 6 MB function limit.
+
+**Online locker (`netlify/functions/`):** a same-origin, rate-limited API stores only ciphertext under a one-way-derived lookup token in Netlify Blobs; it never receives the recovery code or encryption key. Optimistic revisions prevent silent overwrites between browsers. A scheduled cleanup deletes lockers after 180 inactive days. The UI creates, restores, refreshes, disconnects and deletes lockers; opens/downloads local and cloud circuits; exposes recovery snapshots; and keeps ordinary `.me230.json` downloads available.
+
+**Browser (+3):** an edited circuit appears in IndexedDB, File » Recent circuits & Guest Memory lists it, and the dialog offers the account-free encrypted Guest Locker. Existing circuit, simulation and strict-CSP checks remain unchanged.
+
 **v1.13 (loop 10: Quiz 2 review circuits): 346 tests, all passing.** 69 unit, 85 simulation, 192 in-browser.
 
 ## Added in v1.13

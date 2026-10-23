@@ -214,6 +214,31 @@ table.grid th { background: var(--chrome-2); font-weight: 600; white-space: nowr
 .startcard h2 { font-size: 15px; margin: 0 0 6px; }
 .labs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 8px 0; }
 .labs .btn { text-align: left; }
+.memory { display: grid; gap: 10px; min-width: 0; }
+.memory-card { border: 1px solid var(--line); border-radius: 4px; background: var(--chrome-3); padding: 10px; }
+.memory-card h2 { font-size: 14px; margin: 0 0 2px; }
+.memory-card p { margin: 5px 0; }
+.memory-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.memory-heading .note { margin: 0; }
+.memory-usage, .memory-badge { flex: none; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted); background: var(--field); white-space: nowrap; font-size: 11px; }
+.memory-badge { color: var(--ok); border-color: currentColor; }
+.memory-list { border: 1px solid var(--line); background: var(--field); max-height: 190px; overflow: auto; }
+.memory-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 7px; border-bottom: 1px solid var(--line); }
+.memory-row:last-child { border-bottom: 0; }
+.memory-row:hover { background: var(--hover); }
+.memory-main { min-width: 0; display: grid; gap: 1px; }
+.memory-main b, .memory-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-main small { color: var(--muted); }
+.memory-actions { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.memory-actions .btn { min-height: 22px; padding: 1px 8px; }
+.memory-empty { margin: 0; padding: 12px; color: var(--muted); text-align: center; }
+.memory-code { margin: 7px 0; padding: 9px; border: 1px solid var(--line-2); background: var(--field); font: 600 14px/1.2 var(--f-mono); letter-spacing: .04em; text-align: center; user-select: all; overflow-wrap: anywhere; }
+.memory-code-input { width: 100%; height: 30px; font: 13px var(--f-mono); text-transform: uppercase; }
+.memory-restore { width: 410px; max-width: calc(100vw - 40px); }
+.memory-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.memory .danger { color: var(--warn); }
+.memory-privacy { margin: 0 2px; color: var(--muted); font-size: 11px; }
+@media (max-width: 620px) { .memory-row, .memory-heading { align-items: stretch; flex-direction: column; } .memory-actions { justify-content: flex-start; } .memory-usage, .memory-badge { align-self: flex-start; } }
 
 /* ---------- the sheet (fixed colours: Multisim's White Background scheme) ---------- */
 .sch .frame { fill: none; stroke: #7a7a7a; stroke-width: 1; vector-effect: non-scaling-stroke; }

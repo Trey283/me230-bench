@@ -1,6 +1,6 @@
 # ME230 Bench
 
-A Multisim-style circuit workspace in one HTML page, built for SDSU ME 230. It opens Multisim `.ms14` files exactly as they were saved (schematic, symbols, wire colours, net names, instrument panels with their last readings and traces) and simulates them with ngspice compiled to WebAssembly. Everything runs client-side.
+A Multisim-style circuit workspace in one HTML page, built for SDSU ME 230. It opens Multisim `.ms14` files exactly as they were saved (schematic, symbols, wire colours, net names, instrument panels with their last readings and traces) and simulates them with ngspice compiled to WebAssembly. Circuit editing and simulation run client-side.
 
 Not made by or affiliated with NI. Menus, buttons and behaviour follow Multisim 14; icons and drawings are original.
 
@@ -26,12 +26,12 @@ Not made by or affiliated with NI. Menus, buttons and behaviour follow Multisim 
 - **Agilent function generator (33120A) and multimeter (34401A):** the 33120A has its vacuum-fluorescent-style display with a blinking digit cursor, Function keys (sine, square, triangle, ramp, noise), Freq / Ampl / Offset (and Shift + Offset for % duty), the knob and arrow keys to change the digit under the cursor, Enter Number, Menu (OUTPUT TERM 50 Ω or HIGH Z) and Power; like the real one it has a 50 Ω output, so the amplitude shown is what a 50 Ω load sees (or an open circuit, set to HIGH Z), plus a Sync output. The 34401A measures DC V, AC V (true RMS), Ω 2W, Ω 4W, DC I, AC I, Freq, Period, continuity and diode, with auto or manual range, 4½-6½ digits shown the way it does (`+05.00000 VDC` on the 10 V range), Null, Min Max, dB and dBm; terminals HI, LO, HI/LO Sense and I.
 - **Arduino (Lab 6 and the course sketches):** MCU » Arduino sketch shows the sketch, Verify checks it, and Run executes it against the circuit; `Serial.print` output appears in the Serial Monitor, and its input line (with Arduino's line-ending choices) feeds `Serial.available()`, `read()`, `parseInt()`, `parseFloat()` and `readString()`. The `Servo` and `Stepper` libraries work as on a real Uno (50 Hz servo pulses of 544–2400 µs; the Stepper library's step timing and coil order), as do `tone()`/`noTone()`. Help » Open samples has every BareMinimum sketch from the course on a ready-wired circuit: SOS in Morse code, reading a voltage on A2, three LEDs in sequence, a potentiometer threshold LED, a push button and LED, a push-button toggle, software PWM, a stepper with a direction button and a servo with two buttons.
 - **Motors for the sketches:** a hobby servo (its horn turns to the angle set by the pulse width it receives, at the servo's speed) and a 28BYJ-48 stepper on a ULN2003 board (its shaft follows the order the coils are switched, 2048 steps per turn, with the board's phase LEDs), both under Components » Electro_Mechanical.
-- **Saving:** File » Save (Ctrl+S) writes `.me230.json`; open it again with File » Open. Writing `.ms14` isn't supported.
+- **Saving and guest memory:** File » Save (Ctrl+S) writes `.me230.json`; open it again with File » Open. Edits are also automatically recoverable from File » Recent circuits & Guest Memory in the same browser (up to 10 circuits / 5 MB). The optional Guest Locker stores up to 10 circuits / 4 MB online with three previous versions per circuit, using a recovery code instead of an account. Circuit names and contents are AES-GCM encrypted in the browser before upload; the server receives a separate one-way-derived lookup token, not the recovery code or encryption key. Inactive lockers expire after 180 days. Keep downloading `.me230.json` files for important long-term work. Writing `.ms14` isn't supported.
 - **Values** take Multisim prefixes: `2.2k`, `10u`, `4.7M` (mega), `3m` (milli).
 
 ## Commands
 ```
-npm install            # one dev dependency (an XML DOM for Node tests)
+npm install            # test dependencies and the Netlify Blobs client
 node build.mjs         # -> dist/me230-bench.html (single self-contained page, ~2.8 MB)
 npm run test:unit      # decoder, converter, analysis maths            (~2 s)
 npm run test:sim       # real simulations through the WASM engine: every lab starter, and every reading Multisim saved in the course files (~3 min)
@@ -40,7 +40,7 @@ python3 tests/e2e/test_e2e.py   # the built page in headless Chromium (~6 min)
 Tests read the course files from `tests/fixtures/ME230` (override with `ME230_FIXTURES=/path`).
 
 ## Hosting on Netlify
-`netlify.toml` runs `npm run build`, publishes `dist`, and serves the self-contained bench at the site root. No server-side functions, environment variables or external services are required. In Netlify, use `main` as the production branch and leave build-command/publish-directory overrides blank so the checked-in configuration remains authoritative. The deployed app is public unless access control is enabled in Netlify.
+`netlify.toml` runs `npm run build`, publishes `dist`, serves the self-contained bench at the site root, and deploys the Guest Locker function. Netlify Blobs is provisioned automatically, so there are no database credentials or environment variables to configure. A daily scheduled function removes lockers inactive for more than 180 days. In Netlify, use `main` as the production branch and leave build-command/publish-directory overrides blank so the checked-in configuration remains authoritative. The deployed app is public unless access control is enabled in Netlify.
 
 ## Layout
 | Path | What it does |
@@ -55,6 +55,8 @@ Tests read the course files from `tests/fixtures/ME230` (override with `ME230_FI
 | `src/arduino.js` | A small interpreter for the C subset sketches use, with Uno integer sizes. `delay()` hands control to the circuit. |
 | `src/cosim.js` | Runs the sketch and the circuit in turns. Pin changes become source and resistance changes inside the Uno model, and `digitalRead`/`analogRead` see the simulated voltages. |
 | `src/labs.js` | Quiz 2 review circuits with preset analyses, lab starter circuits, the Lab 6 sketch, and the course's BareMinimum sketches each on a wired starter circuit. |
+| `src/storage.js` | IndexedDB autosaves, recovery-code handling, AES-GCM locker encryption, version history and the same-origin Guest Locker API client. |
+| `netlify/functions/` | Rate-limited Netlify Blobs API for encrypted Guest Lockers and the daily 180-day retention cleanup. |
 | `src/motion.js` | What the motors do with their signals: servo horn angle from the pulse width (with slew rate), stepper shaft from the coil sequence. |
 | `src/symbols.js` | Original ANSI-style symbols for every part kind, as drawing data (lines, polygons, circles, text) in the part's own coordinates; switches have open/closed drawings. |
 | `src/catalog.js` | The component database behind Select a Component: Group » Family » Component, each a part kind with its own settings. |

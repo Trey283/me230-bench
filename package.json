@@ -1,6 +1,6 @@
 {
   "name": "me230-bench",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "",
   "directories": {
     "test": "tests"
@@ -19,5 +19,8 @@
     "@xmldom/xmldom": "^0.9.12"
   },
   "type": "module",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@netlify/blobs": "^11.1.6"
+  }
 }

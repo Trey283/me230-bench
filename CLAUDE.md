@@ -12,14 +12,14 @@ Multisim itself won't run. The **goal** is to look and work like Multisim closel
 
 ## Commands
 ```
-npm install                      # once (only @xmldom/xmldom, used by the tests)
+npm install                      # once (test packages plus @netlify/blobs for Guest Lockers)
 npm run build                    # -> dist/me230-bench.html; also syntax-checks the bundle
 npm test                         # unit + simulation tests (node --test), about 1 min
 python3 tests/e2e/test_e2e.py    # in-browser tests, headless Chromium, about 6 min
 ```
 - The in-browser tests need `pip install playwright` and `playwright install chromium`.
 - Build first: the in-browser tests load `dist/me230-bench.html`. Screenshots go to `tests/e2e/shots/`.
-- At v1.13 the counts are 69 unit, 85 simulation and 192 in-browser checks. Keep everything passing.
+- At v1.14 the counts are 74 unit, 85 simulation and 195 in-browser checks. Keep everything passing.
 
 ## How the bundle works (read before adding code)
 - `build.mjs` joins the ES modules in a fixed `order` list and strips `import` and `export` lines. It then runs
