@@ -21,6 +21,15 @@ const wasm = fs.readFileSync(path.join(R, 'src/vendor/ngspice.wasm.gz.b64'), 'ut
 const html = tpl.replace('%WASM_B64%', () => wasm).replace('%BUNDLE%', () => bundle);
 const out = path.join(R, 'dist/me230-bench.html');
 fs.writeFileSync(out, html);
+// Keep hosting headers in the publish directory so Netlify applies the exact
+// policy built and tested with this artifact (including same-origin API calls).
+fs.writeFileSync(path.join(R, 'dist/_headers'), `/*
+  Cache-Control: public, max-age=0, must-revalidate
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+`);
 const mb = (fs.statSync(out).size / 1048576).toFixed(2);
 if (fs.statSync(out).size > 15 * 1048576) throw new Error('page is over the 15 MB budget');
 console.log(`built dist/me230-bench.html (${mb} MB)`);

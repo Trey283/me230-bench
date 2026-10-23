@@ -10,6 +10,8 @@
 
 **Browser (+3):** an edited circuit appears in IndexedDB, File » Recent circuits & Guest Memory lists it, and the dialog offers the account-free encrypted Guest Locker. Existing circuit, simulation and strict-CSP checks remain unchanged.
 
+**v1.14.1 hosting fix:** the production CSP is emitted as `dist/_headers`, alongside the built page, so `connect-src 'self'` is guaranteed to reach Netlify and allow the same-origin Guest Locker API.
+
 **v1.13 (loop 10: Quiz 2 review circuits): 346 tests, all passing.** 69 unit, 85 simulation, 192 in-browser.
 
 ## Added in v1.13
