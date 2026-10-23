@@ -1,6 +1,6 @@
 # Test report
 
-**v1.14 (guest memory and encrypted online lockers): 354 tests, all passing.** 74 unit, 85 simulation, 195 in-browser.
+**v1.14 (guest memory and encrypted online lockers): 355 tests, all passing.** 74 unit, 85 simulation, 196 in-browser.
 
 ## Added in v1.14
 
@@ -8,9 +8,9 @@
 
 **Online locker (`netlify/functions/`):** a same-origin, rate-limited API stores only ciphertext under a one-way-derived lookup token in Netlify Blobs; it never receives the recovery code or encryption key. Optimistic revisions prevent silent overwrites between browsers. A scheduled cleanup deletes lockers after 180 inactive days. The UI creates, restores, refreshes, disconnects and deletes lockers; opens/downloads local and cloud circuits; exposes recovery snapshots; and keeps ordinary `.me230.json` downloads available.
 
-**Browser (+3):** an edited circuit appears in IndexedDB, File » Recent circuits & Guest Memory lists it, and the dialog offers the account-free encrypted Guest Locker. Existing circuit, simulation and strict-CSP checks remain unchanged.
+**Browser (+4):** an edited circuit appears in IndexedDB, File » Recent circuits & Guest Memory lists it, the dialog offers the account-free encrypted Guest Locker, and choosing Delete in a confirmation performs the selected action. Existing circuit, simulation and strict-CSP checks remain unchanged.
 
-**v1.14.2 hosting fix:** the production CSP is emitted as `dist/_headers` and enforced by a small response-only Edge Function. This guarantees that `connect-src 'self'` reaches the browser even if Netlify retains an older site-level header rule, allowing the same-origin Guest Locker API without widening the rest of the policy.
+**v1.14.3 hosting fixes:** the production CSP is emitted as `dist/_headers` and enforced by a small response-only Edge Function. This guarantees that `connect-src 'self'` reaches the browser even if Netlify retains an older site-level header rule, allowing the same-origin Guest Locker API without widening the rest of the policy. Confirmation dialogs now resolve the clicked button before closing, so locker deletion (and existing Save/Don't Save choices) receives the intended answer.
 
 **v1.13 (loop 10: Quiz 2 review circuits): 346 tests, all passing.** 69 unit, 85 simulation, 192 in-browser.
 

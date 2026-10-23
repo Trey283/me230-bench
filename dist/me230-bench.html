@@ -7313,7 +7313,7 @@ function message(title, text, buttons = [{ label: 'OK', def: true }]) {
     const id = 'msg' + Math.random();
     const body = h('div', { style: { maxWidth: '420px' } }, h('p', { style: { margin: '4px 0 6px', whiteSpace: 'pre-wrap' }, text }));
     const row = h('div', { class: 'dlgbtns' });
-    for (const b of buttons) row.append(h('button', { class: 'btn' + (b.def ? ' def' : ''), text: b.label, onclick: () => { WM.close(id); resolve(b.value ?? b.label); } }));
+    for (const b of buttons) row.append(h('button', { class: 'btn' + (b.def ? ' def' : ''), text: b.label, onclick: () => { resolve(b.value ?? b.label); WM.close(id); } }));
     body.append(row);
     WM.open({ id, title, body, modal: true, onClose: () => resolve(null) });
   });
