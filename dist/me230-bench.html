@@ -3871,8 +3871,13 @@ function probeOutputs(circuit) {
 // Multisim expression -> ngspice expression. V(a), V(a,b), I(part), P(part); functions pass through (mag, ph, db...).
 // opts.sense: currents of passive parts come from a 0 V sense source put in series with pin 1 (see senseNetlist)
 function toSpiceExpr(expr, circuit, opts = {}) {
-  const byRef = new Map(circuit.comps.map((c) => [c.ref.toLowerCase(), c]));
-  const node = (x) => (x === '0' ? '0' : `v(${x.toLowerCase()})`);
+  const byRef = new Map(circuit.comps.map((c) => [c.ref.toLowerCase(), c])), nets = netSet(circuit);
+  // never hand ngspice an unresolved node ("v(?)" is a parse error that loses every output)
+  const node = (x, what = `V(${x})`) => {
+    if (x === '0') return '0';
+    if (!nets.has(String(x).toLowerCase())) throw new Error(/^(\?|NC|nc_.*)?$/i.test(String(x ?? '')) ? `${what}: the probe isn’t connected; drop its tip on a wire or pin.` : `${what}: there is no node ${x} in the circuit.`);
+    return `v(${x.toLowerCase()})`;
+  };
   const current = (ref) => {
     const c = byRef.get(ref.toLowerCase()); if (!c) throw new Error(`There is no part ${ref}.`);
     const inst = instanceOf(c); if (!inst) throw new Error(`The current of ${ref} can’t be read (it is a subcircuit).`);
@@ -3883,15 +3888,25 @@ function toSpiceExpr(expr, circuit, opts = {}) {
     const K = k.toUpperCase();
     const pr = !b && byRef.get(a.toLowerCase());
     if (K === 'V' && pr && PROBE_KIND[pr.lib]) {   // a voltage probe: its node (against its reference probe, if it has one)
-      if (pr.lib === 'mdprobe') return `(${pr.pins['+'] === '0' ? 0 : node(pr.pins['+'])}-${pr.pins['-'] === '0' ? 0 : node(pr.pins['-'])})`;
+      const w = `V(${pr.ref})`;
+      if (pr.lib === 'mdprobe') return `(${pr.pins['+'] === '0' ? 0 : node(pr.pins['+'], w)}-${pr.pins['-'] === '0' ? 0 : node(pr.pins['-'], w)})`;
       const n = pr.pins['1'], rp = String((pr.inst || {}).refp || '').trim().toLowerCase(), rc = rp && byRef.get(rp), r = rc ? Object.values(rc.pins)[0] : '0';
-      return r && r !== '0' ? `(${n === '0' ? 0 : node(n)}-${node(r)})` : n === '0' ? '0' : node(n);
+      return r && r !== '0' ? `(${n === '0' ? 0 : node(n, w)}-${node(r, `${w} (reference ${rc.ref})`)})` : n === '0' ? '0' : node(n, w);
     }
     if (K === 'V') return b ? `(${a === '0' ? 0 : node(a)}-${b === '0' ? 0 : node(b)})` : node(a);
     if (K === 'I') return current(a);
     if (K === 'P') { const i = current(a); return `(${across(a)}*${i})`; }
     return all;
   });
+}
+
+const netSet = (circuit) => new Set(circuit.nets.filter((n) => n !== '?' && n !== 'NC' && !/^nc_/i.test(n)).map((n) => n.toLowerCase()));
+// Output-tab entries that still name something: drops V(net), V(PRn), I(part), P(part) left behind by a deleted part or
+// a net that no longer exists (they are saved with the design, so they would outlive the part)
+function liveOutputs(outs, circuit) {
+  const refs = new Map(circuit.comps.map((c) => [c.ref.toLowerCase(), c])), nets = netSet(circuit);
+  const ok = (K, x) => { const l = x.toLowerCase(), c = refs.get(l); return K === 'V' ? l === '0' || nets.has(l) || !!(c && PROBE_KIND[c.lib]) : !!c; };
+  return outs.filter((e) => [...String(e).matchAll(/\b([VIP])\(\s*([^,()\s]+)\s*(?:,\s*([^,()\s]+)\s*)?\)/gi)].every(([, k, a, b]) => ok(k.toUpperCase(), a) && (!b || ok('V', b))));
 }
 
 // parts whose current an expression reads (through I() or P())
@@ -5605,9 +5620,10 @@ async function simulate(exec, circuit, name, switches, line, outs, extra = '') {
   // settype: results of mixed units (a power, a ratio) would otherwise have no type and not be written out
   const { r, errors } = await exec(nl, ['set units=degrees', 'run', ...exprs.flatMap((x, i) => [`let out${i} = ${x}`, `settype voltage out${i}`])]);
   const V = vmap(r);
-  if (!V.size || !outs.every((_, i) => V.has(`out${i}`))) {
+  const lost = outs.filter((_, i) => !V.has(`out${i}`));
+  if (!V.size || lost.length) {
     const why = (errors || []).filter((e) => /error|singular|too small|unknown|no such/i.test(e)).slice(-2).join(' ');
-    throw new Error(`The analysis didn’t produce results.${why ? ' ngspice: ' + why : ''}`);
+    throw new Error(`${V.size ? `No result for ${lost.join(', ')}.` : 'The analysis didn’t produce results.'}${why ? ' ngspice: ' + why : ''}`);
   }
   return { V, outs, nl };
 }
@@ -5631,7 +5647,8 @@ function opTable(title, sets) {
 
 async function runAnalysis({ exec, circuit, name, switches, A, id, rebuild }) {
   // with nothing chosen on the Output tab, the probes on the sheet are the outputs
-  const s = A[id] || {}, title = analysisLabel(id), chosen = (s.out || []).filter(Boolean), outs = chosen.length ? chosen : probeOutputs(circuit).map((v) => v.name);
+  const s = A[id] || {}, title = analysisLabel(id), chosen = liveOutputs((s.out || []).filter(Boolean), circuit), outs = chosen.length ? chosen : probeOutputs(circuit).map((v) => v.name);
+  if (s.out && chosen.length < s.out.length) s.out = chosen;   // forget variables of deleted parts (saved with the design)
   if (id === 'op') return [opTable(title, [await simulate(exec, circuit, name, switches, '.op', outs)])];
   if (id === 'tran') return [tranPage(title, [await simulate(exec, circuit, name, switches, analysisLine('tran', s, circuit), outs)])];
   if (id === 'ac') return [acPage(title, [await simulate(exec, circuit, name, switches, analysisLine('ac', s, circuit), outs)], s.vscale)];
@@ -8162,7 +8179,7 @@ function openAnalysesDialog(ctx, st) {
     return h('p', { class: 'note', text: 'Not available yet.' });
   }
   function outputTab(id) {
-    const s = work[id]; if (!s.out) s.out = [];
+    const s = work[id]; s.out = liveOutputs(s.out || [], circuit);   // a deleted part's variables leave the list
     const all = outputVariables(circuit);
     const filterOpts = () => [['all', 'All variables'], ['voltage', 'Voltages'], ['current', 'Currents'], ['power', 'Powers']].map(([v, t]) => h('option', { value: v, text: t }));
     const filter = h('select', { class: 'fld', 'aria-label': 'Variable filter' }, ...filterOpts()), filterR = h('select', { class: 'fld', 'aria-label': 'Selected variable filter' }, ...filterOpts());

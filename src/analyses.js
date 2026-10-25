@@ -75,8 +75,13 @@ export function probeOutputs(circuit) {
 // Multisim expression -> ngspice expression. V(a), V(a,b), I(part), P(part); functions pass through (mag, ph, db...).
 // opts.sense: currents of passive parts come from a 0 V sense source put in series with pin 1 (see senseNetlist)
 export function toSpiceExpr(expr, circuit, opts = {}) {
-  const byRef = new Map(circuit.comps.map((c) => [c.ref.toLowerCase(), c]));
-  const node = (x) => (x === '0' ? '0' : `v(${x.toLowerCase()})`);
+  const byRef = new Map(circuit.comps.map((c) => [c.ref.toLowerCase(), c])), nets = netSet(circuit);
+  // never hand ngspice an unresolved node ("v(?)" is a parse error that loses every output)
+  const node = (x, what = `V(${x})`) => {
+    if (x === '0') return '0';
+    if (!nets.has(String(x).toLowerCase())) throw new Error(/^(\?|NC|nc_.*)?$/i.test(String(x ?? '')) ? `${what}: the probe isn’t connected; drop its tip on a wire or pin.` : `${what}: there is no node ${x} in the circuit.`);
+    return `v(${x.toLowerCase()})`;
+  };
   const current = (ref) => {
     const c = byRef.get(ref.toLowerCase()); if (!c) throw new Error(`There is no part ${ref}.`);
     const inst = instanceOf(c); if (!inst) throw new Error(`The current of ${ref} can’t be read (it is a subcircuit).`);
@@ -87,15 +92,25 @@ export function toSpiceExpr(expr, circuit, opts = {}) {
     const K = k.toUpperCase();
     const pr = !b && byRef.get(a.toLowerCase());
     if (K === 'V' && pr && PROBE_KIND[pr.lib]) {   // a voltage probe: its node (against its reference probe, if it has one)
-      if (pr.lib === 'mdprobe') return `(${pr.pins['+'] === '0' ? 0 : node(pr.pins['+'])}-${pr.pins['-'] === '0' ? 0 : node(pr.pins['-'])})`;
+      const w = `V(${pr.ref})`;
+      if (pr.lib === 'mdprobe') return `(${pr.pins['+'] === '0' ? 0 : node(pr.pins['+'], w)}-${pr.pins['-'] === '0' ? 0 : node(pr.pins['-'], w)})`;
       const n = pr.pins['1'], rp = String((pr.inst || {}).refp || '').trim().toLowerCase(), rc = rp && byRef.get(rp), r = rc ? Object.values(rc.pins)[0] : '0';
-      return r && r !== '0' ? `(${n === '0' ? 0 : node(n)}-${node(r)})` : n === '0' ? '0' : node(n);
+      return r && r !== '0' ? `(${n === '0' ? 0 : node(n, w)}-${node(r, `${w} (reference ${rc.ref})`)})` : n === '0' ? '0' : node(n, w);
     }
     if (K === 'V') return b ? `(${a === '0' ? 0 : node(a)}-${b === '0' ? 0 : node(b)})` : node(a);
     if (K === 'I') return current(a);
     if (K === 'P') { const i = current(a); return `(${across(a)}*${i})`; }
     return all;
   });
+}
+
+const netSet = (circuit) => new Set(circuit.nets.filter((n) => n !== '?' && n !== 'NC' && !/^nc_/i.test(n)).map((n) => n.toLowerCase()));
+// Output-tab entries that still name something: drops V(net), V(PRn), I(part), P(part) left behind by a deleted part or
+// a net that no longer exists (they are saved with the design, so they would outlive the part)
+export function liveOutputs(outs, circuit) {
+  const refs = new Map(circuit.comps.map((c) => [c.ref.toLowerCase(), c])), nets = netSet(circuit);
+  const ok = (K, x) => { const l = x.toLowerCase(), c = refs.get(l); return K === 'V' ? l === '0' || nets.has(l) || !!(c && PROBE_KIND[c.lib]) : !!c; };
+  return outs.filter((e) => [...String(e).matchAll(/\b([VIP])\(\s*([^,()\s]+)\s*(?:,\s*([^,()\s]+)\s*)?\)/gi)].every(([, k, a, b]) => ok(k.toUpperCase(), a) && (!b || ok('V', b))));
 }
 
 // parts whose current an expression reads (through I() or P())

@@ -1,6 +1,6 @@
 # Test report
 
-**v1.14 (guest memory and encrypted online lockers): 355 tests, all passing.** 74 unit, 85 simulation, 196 in-browser.
+**v1.14 (guest memory and encrypted online lockers): 356 tests, all passing.** 74 unit, 86 simulation, 196 in-browser.
 
 ## Added in v1.14
 
@@ -9,6 +9,8 @@
 **Online locker (`netlify/functions/`):** a same-origin, rate-limited API stores only ciphertext under a one-way-derived lookup token in Netlify Blobs; it never receives the recovery code or encryption key. Optimistic revisions prevent silent overwrites between browsers. A scheduled cleanup deletes lockers after 180 inactive days. The UI creates, restores, refreshes, disconnects and deletes lockers; opens/downloads local and cloud circuits; exposes recovery snapshots; and keeps ordinary `.me230.json` downloads available.
 
 **Browser (+4):** an edited circuit appears in IndexedDB, File » Recent circuits & Guest Memory lists it, the dialog offers the account-free encrypted Guest Locker, and choosing Delete in a confirmation performs the selected action. Existing circuit, simulation and strict-CSP checks remain unchanged.
+
+**v1.14.4 analysis output fix:** a Transient (or any analysis) with V(PR1) selected, where PR1's tip touched no wire, sent ngspice `let out0 = v(?)` and failed with the generic "didn't produce results". Output expressions now never emit an unresolved node: a floating probe gives "V(PR1): the probe isn't connected", and an unknown node names itself. Selected variables of deleted parts or nets (saved with the design) are dropped at run time and from the Output tab, and a missing result names the variable. `tests/sim/probes.test.mjs` covers the floating probe, the unknown node and the stale V/I/P entries.
 
 **v1.14.3 hosting fixes:** the production CSP is emitted as `dist/_headers` and enforced by a small response-only Edge Function. This guarantees that `connect-src 'self'` reaches the browser even if Netlify retains an older site-level header rule, allowing the same-origin Guest Locker API without widening the rest of the policy. Confirmation dialogs now resolve the clicked button before closing, so locker deletion (and existing Save/Don't Save choices) receives the intended answer.
 

@@ -2,7 +2,7 @@
 // exec(netlist, mid) runs ngspice (mid = the commands between "source" and "write") and resolves to { r } with r.data
 // [{ name, values }]; values are numbers, or { real, img } for AC results.
 import { toNetlist } from './netlist.js';
-import { analysisLine, analysisLabel, toSpiceExpr, sweepValues, fourier, cmag, cphase, creal, currentRefs, senseNetlist, probeOutputs } from './analyses.js';
+import { analysisLine, analysisLabel, toSpiceExpr, sweepValues, fourier, cmag, cphase, creal, currentRefs, senseNetlist, probeOutputs, liveOutputs } from './analyses.js';
 
 const ROPT = '.options rshunt=1e12\n';
 // the raw-file reader names "let" results by type ("v(out0)", "i(out1)"); keep the plain name too
@@ -17,9 +17,10 @@ async function simulate(exec, circuit, name, switches, line, outs, extra = '') {
   // settype: results of mixed units (a power, a ratio) would otherwise have no type and not be written out
   const { r, errors } = await exec(nl, ['set units=degrees', 'run', ...exprs.flatMap((x, i) => [`let out${i} = ${x}`, `settype voltage out${i}`])]);
   const V = vmap(r);
-  if (!V.size || !outs.every((_, i) => V.has(`out${i}`))) {
+  const lost = outs.filter((_, i) => !V.has(`out${i}`));
+  if (!V.size || lost.length) {
     const why = (errors || []).filter((e) => /error|singular|too small|unknown|no such/i.test(e)).slice(-2).join(' ');
-    throw new Error(`The analysis didn’t produce results.${why ? ' ngspice: ' + why : ''}`);
+    throw new Error(`${V.size ? `No result for ${lost.join(', ')}.` : 'The analysis didn’t produce results.'}${why ? ' ngspice: ' + why : ''}`);
   }
   return { V, outs, nl };
 }
@@ -43,7 +44,8 @@ function opTable(title, sets) {
 
 export async function runAnalysis({ exec, circuit, name, switches, A, id, rebuild }) {
   // with nothing chosen on the Output tab, the probes on the sheet are the outputs
-  const s = A[id] || {}, title = analysisLabel(id), chosen = (s.out || []).filter(Boolean), outs = chosen.length ? chosen : probeOutputs(circuit).map((v) => v.name);
+  const s = A[id] || {}, title = analysisLabel(id), chosen = liveOutputs((s.out || []).filter(Boolean), circuit), outs = chosen.length ? chosen : probeOutputs(circuit).map((v) => v.name);
+  if (s.out && chosen.length < s.out.length) s.out = chosen;   // forget variables of deleted parts (saved with the design)
   if (id === 'op') return [opTable(title, [await simulate(exec, circuit, name, switches, '.op', outs)])];
   if (id === 'tran') return [tranPage(title, [await simulate(exec, circuit, name, switches, analysisLine('tran', s, circuit), outs)])];
   if (id === 'ac') return [acPage(title, [await simulate(exec, circuit, name, switches, analysisLine('ac', s, circuit), outs)], s.vscale)];

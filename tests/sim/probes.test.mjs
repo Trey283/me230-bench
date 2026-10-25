@@ -51,6 +51,21 @@ test('a current probe dropped on a wire cuts it and reads the current through it
   const c2 = toCircuit(d); assert.equal(c2.comps.find((x) => x.ref === r1.ref).pins['1'], c2.comps.find((x) => x.ref === v.ref).pins['1'], 'deleting the probe joins the wire again');
 });
 
+test('Transient: a floating probe is named, and variables of deleted parts are dropped instead of breaking the run', async () => {
+  const { d, r2 } = divider(), pr = addPart(d, 'mvprobe', 400, 400), gone = addPart(d, 'miprobe', 400, 300); deletePart(d, gone);
+  const c = toCircuit(d), A = defaultAnalyses(), node = c.comps.find((x) => x.ref === r2.ref).pins['1'];
+  Object.assign(A.tran, { tstop: '1m', out: ['V(PR1)', 'I(R2)'] });
+  // the probe touches no wire: its tip is net "?", which used to reach ngspice as "let out0 = v(?)"
+  await assert.rejects(runAnalysis({ exec, circuit: c, name: 'div', switches: {}, A, id: 'tran' }), /V\(PR1\): the probe isn’t connected/);
+  assert.throws(() => toSpiceExpr('V(N99)', c), /no node N99/);
+  deletePart(d, pr); const c2 = toCircuit(d);
+  A.tran.out = ['V(PR1)', 'I(PR2)', 'P(U1)', `V(${node})`, 'I(R2)'];   // PR1, PR2 and U1 no longer exist
+  const [p] = await runAnalysis({ exec, circuit: c2, name: 'div', switches: {}, A, id: 'tran' });
+  assert.deepEqual(p.graphs[0].traces.map((t) => t.name), [`V(${node})`, 'I(R2)']);
+  near(p.graphs[0].traces[0].y.at(-1), 8, 1e-6, 'V across R2');
+  assert.deepEqual(A.tran.out, [`V(${node})`, 'I(R2)'], 'the stale entries leave the saved selection');
+});
+
 test('a current probe turns upright to fit a vertical wire', () => {
   const d = newDoc('v'); addWire(d, [[90, 0], [90, 90]]);
   const pr = addPart(d, 'miprobe', 90, 45);

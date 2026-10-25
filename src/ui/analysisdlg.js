@@ -1,7 +1,7 @@
 // analysisdlg.js — Simulate » Analyses and simulation, laid out like Multisim 14: the analysis list on the left, the
 // chosen analysis's tabs on the right (Analysis parameters, Output, Analysis options, Summary), Run / Save / Cancel.
 import { h, WM } from './shell.js';
-import { ANALYSES, analysisLine, outputVariables, analysisSources, analysisLabel, sweepValues } from '../analyses.js';
+import { ANALYSES, analysisLine, outputVariables, analysisSources, analysisLabel, sweepValues, liveOutputs } from '../analyses.js';
 
 const AN_ID = 'analyses';
 export function openAnalysesDialog(ctx, st) {
@@ -73,7 +73,7 @@ export function openAnalysesDialog(ctx, st) {
     return h('p', { class: 'note', text: 'Not available yet.' });
   }
   function outputTab(id) {
-    const s = work[id]; if (!s.out) s.out = [];
+    const s = work[id]; s.out = liveOutputs(s.out || [], circuit);   // a deleted part's variables leave the list
     const all = outputVariables(circuit);
     const filterOpts = () => [['all', 'All variables'], ['voltage', 'Voltages'], ['current', 'Currents'], ['power', 'Powers']].map(([v, t]) => h('option', { value: v, text: t }));
     const filter = h('select', { class: 'fld', 'aria-label': 'Variable filter' }, ...filterOpts()), filterR = h('select', { class: 'fld', 'aria-label': 'Selected variable filter' }, ...filterOpts());

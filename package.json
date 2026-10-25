@@ -1,6 +1,6 @@
 {
   "name": "me230-bench",
-  "version": "1.14.3",
+  "version": "1.14.4",
   "description": "",
   "directories": {
     "test": "tests"
