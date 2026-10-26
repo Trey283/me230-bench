@@ -1,6 +1,8 @@
 # Test report
 
-**v1.15 (HW3: Laplace, transfer functions, Fourier; Multisim's PWL/EXP/ABM sources and TD switch): 372 tests, all passing.** 74 unit, 95 simulation, 203 in-browser.
+**v1.15 (HW3: Laplace, transfer functions, Fourier; Multisim's PWL/EXP/ABM sources and TD switch): 377 tests, all passing.** 74 unit, 95 simulation, 208 in-browser.
+
+**v1.15.1 Grapher cursor fixes (+5 in-browser):** cursors were stored as a fraction of the visible window, so zooming (box, wheel, double-click) slid them onto other x values and Set X outside the zoom clamped to the edge; they now hold their x value and are hidden while zoomed out of view. Y_MAX/Y_MIN from a right-click searched the first graph (Magnitude) even on the Phase graph. Double-click never restored the view, because each click rebuilt the canvas before the dblclick arrived. Checked against HW3 problem 10's v(t): drag to 1 s reads v(1), Set X at 0.25 s / 1.75 s, zoom keeps both, double-click restores, and Phase vs Magnitude Y_MAX.
 
 ## Added in v1.15
 

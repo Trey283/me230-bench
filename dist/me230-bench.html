@@ -7974,7 +7974,7 @@ function grapherState(st) {
 }
 function addGrapherPages(ctx, st, pages) {
   const G = grapherState(st);
-  for (const p of pages) { p.views = (p.graphs || []).map(() => null); p.cur = { c1: 0.25, c2: 0.75, trace: 0 }; G.pages.push(p); }
+  for (const p of pages) { p.views = (p.graphs || []).map(() => null); p.cur = { trace: 0 }; if (p.graphs && p.graphs.length) { p.cur.c1 = grXAt(p, 0.25); p.cur.c2 = grXAt(p, 0.75); } G.pages.push(p); }   // cursors are x values, so zooming leaves them on their point
   G.cur = G.pages.length - 1;
   openGrapher(ctx, st);
 }
@@ -8011,16 +8011,16 @@ function openGrapher(ctx, st) {
   for (const [label, items] of menus) { const b = h('button', { role: 'menuitem', text: label }); b.addEventListener('click', () => { const r = b.getBoundingClientRect(); openMenu(items(), r.left, r.bottom); sync(); }); mb.append(b); }
   const cursorMenu = () => {
     const p = page(); const ok = !!(p && p.graphs && G.opts.cursors);
-    const go = (which, want, dir) => () => { grGoExtreme(p, which, want, dir); render(); };
+    const go = (which, want, dir) => () => { grGoExtreme(p, which, want, dir, p.cur.graph || 0); render(); };
     return [1, 2].flatMap((k) => [{ label: `Cursor ${k}: go to next Y_MAX =>`, enabled: ok, action: go(`c${k}`, 'max', 1) }, { label: `Cursor ${k}: go to next Y_MIN =>`, enabled: ok, action: go(`c${k}`, 'min', 1) },
       { label: `Cursor ${k}: go to next Y_MAX <=`, enabled: ok, action: go(`c${k}`, 'max', -1) }, { label: `Cursor ${k}: go to next Y_MIN <=`, enabled: ok, action: go(`c${k}`, 'min', -1) }])
       .concat([{ sep: true }, { label: 'Set X value...', enabled: ok, action: () => setX(p) }]);
   };
   const delPage = (i) => { G.pages.splice(i, 1); G.cur = Math.max(0, Math.min(G.cur, G.pages.length - 1)); render(); };
   const setX = (p) => {
-    const i1 = h('input', { class: 'fld', 'aria-label': 'Cursor 1 X', value: grFmt(grXAt(p, p.cur.c1)) }), i2 = h('input', { class: 'fld', 'aria-label': 'Cursor 2 X', value: grFmt(grXAt(p, p.cur.c2)) });
+    const i1 = h('input', { class: 'fld', 'aria-label': 'Cursor 1 X', value: grFmt(p.cur.c1) }), i2 = h('input', { class: 'fld', 'aria-label': 'Cursor 2 X', value: grFmt(p.cur.c2) });
     WM.open({ id: 'gsetx', title: 'Set X Value', modal: true, body: h('div', {}, h('div', { class: 'row' }, h('label', { text: 'Cursor 1:' }), i1), h('div', { class: 'row' }, h('label', { text: 'Cursor 2:' }), i2),
-      h('div', { class: 'dlgbtns' }, h('button', { class: 'btn def', text: 'OK', onclick: () => { const v1 = ctx.parseNum(i1.value), v2 = ctx.parseNum(i2.value); if (isFinite(v1)) p.cur.c1 = grFracOf(p, v1); if (isFinite(v2)) p.cur.c2 = grFracOf(p, v2); WM.close('gsetx'); render(); } }),
+      h('div', { class: 'dlgbtns' }, h('button', { class: 'btn def', text: 'OK', onclick: () => { const v1 = ctx.parseNum(i1.value), v2 = ctx.parseNum(i2.value); if (isFinite(v1)) p.cur.c1 = v1; if (isFinite(v2)) p.cur.c2 = v2; WM.close('gsetx'); render(); } }),
         h('button', { class: 'btn', text: 'Cancel', onclick: () => WM.close('gsetx') }))) });
   };
   // the cursor readout is its own small window, one column per trace, as in Multisim
@@ -8175,7 +8175,8 @@ function drawGraph(cv, p, gi, opts) {
   }
   // cursors
   if (opts.cursors) for (const [k, col] of [['c1', '#ff3030'], ['c2', '#2f6bff']]) {
-    const x = L + p.cur[k] * (R - L); g.strokeStyle = col; g.lineWidth = dpr; g.beginPath(); g.moveTo(x, T); g.lineTo(x, B); g.stroke();
+    const cx = p.cur[k]; if (!(cx >= Math.min(v.x0, v.x1) && cx <= Math.max(v.x0, v.x1))) continue;   // zoomed out of view
+    const x = X(cx); g.strokeStyle = col; g.lineWidth = dpr; g.beginPath(); g.moveTo(x, T); g.lineTo(x, B); g.stroke();
     g.fillStyle = col; g.beginPath(); g.moveTo(x - 5 * dpr, T); g.lineTo(x + 5 * dpr, T); g.lineTo(x, T + 7 * dpr); g.fill(); g.textAlign = 'left'; g.fillText(k === 'c1' ? '1' : '2', x + 4 * dpr, T + 16 * dpr);
   }
   // the selected graph carries Multisim's red marker in its left margin
@@ -8197,18 +8198,18 @@ function grAttach(cv, p, gi, G, render, redraw, props) {
   cv.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return; const q = rel(e); cv.setPointerCapture(e.pointerId);
     if ((p.cur.graph || 0) !== gi) { p.cur.graph = gi; redraw(); }
-    if (G.opts.cursors) { const d1 = Math.abs(q.fx - p.cur.c1), d2 = Math.abs(q.fx - p.cur.c2); const near = Math.min(d1, d2) * (q.w - GM.l - GM.r); if (near < 8) { drag = { k: d1 <= d2 ? 'c1' : 'c2' }; return; } }
+    if (G.opts.cursors) { const d1 = Math.abs(q.fx - grFracOf(p, p.cur.c1)), d2 = Math.abs(q.fx - grFracOf(p, p.cur.c2)); const near = Math.min(d1, d2) * (q.w - GM.l - GM.r); if (near < 8) { drag = { k: d1 <= d2 ? 'c1' : 'c2' }; return; } }
     drag = { zoom: true, a: q.x };
   });
   cv.addEventListener('pointermove', (e) => {
     if (!drag) return; const q = rel(e);
-    if (drag.k) { p.cur[drag.k] = q.fx; redraw(); }
+    if (drag.k) { p.cur[drag.k] = grXAt(p, q.fx); redraw(); }
     else { p.zoomBox = { gi, a: drag.a, b: q.x }; drawGraph(cv, p, gi, G.opts); }
   });
   cv.addEventListener('pointerup', (e) => {
     const d = drag; drag = null; if (!d || !d.zoom) return;
     const q = rel(e); p.zoomBox = null;
-    if (Math.abs(q.x - d.a) < 6) { render(); return; }
+    if (Math.abs(q.x - d.a) < 6) { redraw(); return; }   // a click: repaint, don't rebuild (a rebuilt canvas never gets the dblclick)
     const f0 = Math.min(1, Math.max(0, (Math.min(q.x, d.a) - GM.l) / (q.w - GM.l - GM.r))), f1 = Math.min(1, Math.max(0, (Math.max(q.x, d.a) - GM.l) / (q.w - GM.l - GM.r)));
     p.graphs.forEach((gph, i) => { const v = grViewOf(p, i), lg = gph.xlog; const at = (f) => (lg ? 10 ** (Math.log10(v.x0) + f * (Math.log10(v.x1) - Math.log10(v.x0))) : v.x0 + f * (v.x1 - v.x0)); p.views[i] = { x0: at(f0), x1: at(f1), yAuto: true }; });
     render();
@@ -8221,20 +8222,20 @@ function grAttach(cv, p, gi, G, render, redraw, props) {
     render();
   }, { passive: false });
   cv.addEventListener('contextmenu', (e) => {
-    e.preventDefault(); const q = rel(e), which = Math.abs(q.fx - p.cur.c1) <= Math.abs(q.fx - p.cur.c2) ? 'c1' : 'c2';
-    const go = (want, dir) => () => { if (!G.opts.cursors) G.opts.cursors = true; grGoExtreme(p, which, want, dir); render(); };
+    e.preventDefault(); const q = rel(e), which = Math.abs(q.fx - grFracOf(p, p.cur.c1)) <= Math.abs(q.fx - grFracOf(p, p.cur.c2)) ? 'c1' : 'c2';
+    const go = (want, dir) => () => { if (!G.opts.cursors) G.opts.cursors = true; grGoExtreme(p, which, want, dir, gi); render(); };
     openMenu([{ label: 'Go to next Y_MAX =>', action: go('max', 1) }, { label: 'Go to next Y_MIN =>', action: go('min', 1) }, { label: 'Go to next Y_MAX <=', action: go('max', -1) }, { label: 'Go to next Y_MIN <=', action: go('min', -1) },
       { sep: true }, ...p.graphs[gi].traces.map((t, k) => ({ label: `Select trace: ${t.name}`, checked: p.cur.trace === k, action: () => { p.cur.trace = k; render(); } })), { sep: true }, { label: 'Zoom to fit', action: () => { p.views = p.views.map(() => null); render(); } }, { label: 'Properties...', action: () => { p.cur.graph = gi; props(); } }], e.clientX, e.clientY);
   });
 }
-function grGoExtreme(p, which, want, dir) {
-  const gph = p.graphs[0], t = gph.traces[p.cur.trace] || gph.traces[0]; if (!t) return;
-  const x0 = grXAt(p, p.cur[which]); let i = 0; while (i < t.x.length - 1 && t.x[i] < x0) i++;
+function grGoExtreme(p, which, want, dir, gi = 0) {
+  const gph = p.graphs[gi] || p.graphs[0], t = gph.traces[p.cur.trace] || gph.traces[0]; if (!t) return;
+  const x0 = p.cur[which]; let i = 0; while (i < t.x.length - 1 && t.x[i] < x0) i++;
   const better = (a, b) => (want === 'max' ? a > b : a < b);
-  for (i += dir; i > 0 && i < t.x.length - 1; i += dir) if (better(t.y[i], t.y[i - 1]) && !better(t.y[i + 1], t.y[i]) && t.x[i] >= grXAt(p, 0) && t.x[i] <= grXAt(p, 1)) { p.cur[which] = grFracOf(p, t.x[i]); return; }
+  for (i += dir; i > 0 && i < t.x.length - 1; i += dir) if (better(t.y[i], t.y[i - 1]) && !better(t.y[i + 1], t.y[i]) && t.x[i] >= grXAt(p, 0) && t.x[i] <= grXAt(p, 1)) { p.cur[which] = t.x[i]; return; }
 }
 function grReadout(p) {
-  const x1 = grXAt(p, p.cur.c1), x2 = grXAt(p, p.cur.c2), cols = [];
+  const x1 = p.cur.c1, x2 = p.cur.c2, cols = [];
   for (const gph of p.graphs) for (const t of gph.traces) {
     const y1 = interp(t.x, t.y, x1), y2 = interp(t.x, t.y, x2); let mn = Infinity, mx = -Infinity, mnx = Infinity, mxx = -Infinity;
     for (let i = 0; i < t.y.length; i++) { const y = t.y[i]; if (y < mn) mn = y; if (y > mx) mx = y; } for (const x of t.x) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; }
