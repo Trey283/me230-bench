@@ -29,7 +29,7 @@ import { newDoc, fromImported, toCircuit, toDrawing, addPart, rotatePart, rotate
 import { toNetlist, timeScales, meterVectorName, setAcDrive, num } from '../netlist.js';
 import { describe, sweepSources, meterNumber } from '../instruments.js';
 import { windowStats, bodeFromAc } from '../analysis.js';
-import { h, WM, openMenu, buildMenubar, bindShortcuts, buildToolbar, refreshToolbars, message } from './shell.js';
+import { h, WM, openMenu, buildMenubar, bindShortcuts, buildToolbar, refreshToolbars, message, tipAttrs } from './shell.js';
 import { icon } from './icons.js';
 import { drawSheet } from './sheet.js';
 import { attachEditor } from './editor.js';
@@ -1594,7 +1594,7 @@ buildToolbar(tbs, 'Standard', [{ icon: 'new', title: 'New', key: 'Ctrl+N', actio
 buildToolbar(tbs, 'View', [{ icon: 'full', title: 'Full screen', action: fullScreen },
   { icon: 'zoomIn', title: 'Zoom in', action: () => zoomBy(1 / 1.25) }, { icon: 'zoomOut', title: 'Zoom out', action: () => zoomBy(1.25) },
   { icon: 'zoomArea', title: 'Zoom to fit', action: () => cur && fitView(cur) }, { icon: 'zoomFit', title: 'Zoom sheet', action: () => cur && zoomSheet(cur) }]);
-const inUse = h('select', { 'aria-label': 'In-use list', title: 'In-use list: parts already in this design' });
+const inUse = h('select', { 'aria-label': 'In-use list', ...tipAttrs('In-use list') });
 const fillInUse = () => {
   const seen = new Map();
   if (cur) for (const p of cur.doc.parts) { if (p.type === 'imported' || p.type === 'ground' || !LIBRARY[p.type] || notBom(p)) continue; const cm = componentOf(p); const k = cm ? cm.id : p.type; if (!seen.has(k)) seen.set(k, { cm, p }); }
@@ -1606,7 +1606,7 @@ fillInUse();
 buildToolbar(tbs, 'Main', [{ icon: 'toolbox', title: 'Design Toolbox', action: () => { prefs.toolbox = !prefs.toolbox; savePrefs(); applyLayout(); }, pressed: () => prefs.toolbox },
   { icon: 'sheet', title: 'Spreadsheet View', action: () => { prefs.spreadsheet = !prefs.spreadsheet; savePrefs(); applyLayout(); }, pressed: () => prefs.spreadsheet },
   { icon: 'netlist', title: 'SPICE Netlist Viewer', action: () => openNetlistWin() }, { icon: 'grapher', title: 'Grapher', action: () => cur && openGrapher(ctx, cur) }, { icon: 'analyses', title: 'Analyses and simulation', action: () => cur && openAnalysesDialog(ctx, cur) }, { icon: 'erc', title: 'Electrical rules check', action: () => cur && erc(cur) }, { el: inUse }]);
-const activeSel = h('select', { 'aria-label': 'Active analysis', title: 'Active analysis' }, ...ANALYSES.filter((a) => a.run).map((a) => h('option', { value: a.id, text: a.id === 'interactive' ? 'Interactive' : a.label })));
+const activeSel = h('select', { 'aria-label': 'Active analysis', ...tipAttrs('Active analysis') }, ...ANALYSES.filter((a) => a.run).map((a) => h('option', { value: a.id, text: a.id === 'interactive' ? 'Interactive' : a.label })));
 activeSel.addEventListener('change', () => { if (cur) { const A = analysesOf(cur); A.active = activeSel.value; markDirty(cur); } activeSel.blur(); });
 const syncActive = () => { if (cur) activeSel.value = analysesOf(cur).active || 'interactive'; };
 buildToolbar(tbs, 'Simulation', [{ icon: 'run', title: 'Run', key: 'F5', action: () => runActive(), enabled: () => !!cur && !isRunning(cur) && engineOK !== false && !analysisBusy },

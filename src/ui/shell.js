@@ -1,6 +1,7 @@
 // shell.js — the application frame: menu bar, drop-down and context menus, toolbars, keyboard shortcuts and
 // floating windows (instrument front panels, dialogs, Grapher). Pure DOM, no framework.
 import { icon } from './icons.js';
+import { uiTipFor } from './tips.js';
 
 const h = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -104,13 +105,42 @@ export function bindShortcuts(menus, extra = []) {
 
 /* ---------- toolbars ---------- */
 const tbItems = [];
+// ---------- button tips: the name (and shortcut) highlighted, then what the button is for ----------
+// buttons with a description get data-tip instead of title (so the browser's own tooltip doesn't cover it)
+export function tipAttrs(name, key, tip = uiTipFor(name)) {
+  return tip ? { 'data-tipname': name, 'data-tipkey': key || null, 'data-tip': tip, 'aria-description': tip } : { title: name + (key ? ` (${key})` : '') };
+}
+let tipEl = null, tipFor = null, tipTimer = null, tipShownAt = -Infinity;
+function tipHide() { clearTimeout(tipTimer); tipFor = null; if (tipEl && !tipEl.hidden) { tipEl.hidden = true; tipShownAt = performance.now(); } }
+function tipShow(b) {
+  if (!tipEl) { tipEl = h('div', { class: 'uitip', role: 'tooltip', hidden: true }); document.body.append(tipEl); }
+  tipEl.textContent = '';
+  tipEl.append(h('b', { text: b.dataset.tipname }, ...(b.dataset.tipkey ? [h('span', { class: 'k', text: b.dataset.tipkey })] : [])), h('span', { text: b.dataset.tip }));
+  tipEl.hidden = false;
+  // below the button, or to its left for the vertical Instruments toolbar; kept inside the window
+  const r = b.getBoundingClientRect(), t = tipEl.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight, side = !!b.closest('.tbv');
+  let x = side ? r.left - t.width - 6 : r.left, y = side ? r.top : r.bottom + 6;
+  if (y + t.height > H - 4) y = r.top - t.height - 6;
+  tipEl.style.left = `${Math.max(4, Math.min(x, W - t.width - 4))}px`; tipEl.style.top = `${Math.max(4, y)}px`;
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerover', (e) => {
+    const b = e.target.closest && e.target.closest('[data-tip]');
+    if (b === tipFor) return;
+    tipHide(); if (!b) return;
+    tipFor = b;   // moving along a toolbar with a tip just shown: show at once, as native tooltips do
+    tipTimer = setTimeout(() => tipFor === b && b.isConnected && tipShow(b), performance.now() - tipShownAt < 600 ? 0 : 450);
+  });
+  for (const ev of ['pointerdown', 'keydown', 'wheel', 'blur']) window.addEventListener(ev, tipHide, true);
+  document.addEventListener('pointerout', (e) => { if (tipFor && !(e.relatedTarget && tipFor.contains(e.relatedTarget)) && tipFor.contains(e.target)) tipHide(); });
+}
 export function buildToolbar(parent, name, items, vertical = false) {
   const bar = h('div', { class: vertical ? 'tbv' : 'tb', role: 'toolbar', 'aria-label': name, 'aria-orientation': vertical ? 'vertical' : null });
   bar.append(h('span', { class: 'grip' }));
   for (const it of items) {
     if (it === '|') { bar.append(h('span', { class: 'sep' })); continue; }
     if (it.el) { bar.append(it.el); continue; }
-    const b = h('button', { class: 'tbtn' + (it.wide ? ' wide' : ''), title: it.title + (it.key ? ` (${it.key})` : ''), 'aria-label': it.title, html: icon(it.icon) + (it.wide ? `<span>${it.wide}</span>` : '') });
+    const b = h('button', { class: 'tbtn' + (it.wide ? ' wide' : ''), ...tipAttrs(it.title, it.key, it.tip), 'aria-label': it.title, html: icon(it.icon) + (it.wide ? `<span>${it.wide}</span>` : '') });
     b.addEventListener('click', (e) => { e.currentTarget.blur(); if (!b.disabled) it.action(e); });
     tbItems.push({ b, it }); bar.append(b);
   }

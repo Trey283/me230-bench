@@ -103,6 +103,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 #stSim .live { color: var(--ok); font-weight: 600; }
 
 /* ---------- menus ---------- */
+.uitip { position: fixed; z-index: 2000; max-width: 300px; background: var(--chrome-3); color: var(--ink); border: 1px solid var(--hover-line); border-left: 3px solid var(--accent); border-radius: 3px; padding: 5px 8px 6px; font-size: 12px; line-height: 1.35; box-shadow: 2px 3px 10px rgba(0,0,0,.25); pointer-events: none; }
+.uitip b { display: block; color: var(--accent); font-size: 12.5px; margin-bottom: 2px; }
+.uitip .k { margin-left: 8px; font-weight: 400; color: var(--muted); font-size: 11px; }
 .menu { position: fixed; z-index: 1000; min-width: 200px; background: var(--chrome-3); border: 1px solid var(--line-2); box-shadow: 2px 3px 8px rgba(0,0,0,.22); padding: 2px; }
 .menu .mi { display: grid; grid-template-columns: 22px 1fr auto 14px; align-items: center; gap: 4px; width: 100%; border: 1px solid transparent; background: none; text-align: left; padding: 2px 4px; cursor: default; white-space: nowrap; }
 .menu .mi:hover:not(:disabled), .menu .mi.open { background: var(--hover); border-color: var(--hover-line); }
@@ -7279,9 +7282,98 @@ const ICONS = {
 };
 const icon = (name) => ICONS[name] || ICONS.props;
 
+/* ===== src/ui/tips.js ===== */
+// tips.js — what each toolbar button does, shown under its name when the pointer rests on it (a teaching aid: Multisim
+// itself only shows the name). Keyed by the button's name; a name with no entry gets the plain browser tooltip.
+const UI_TIPS = {
+  // Standard
+  'New': 'Start a blank design in a new tab.',
+  'Open': 'Open a Multisim .ms14 file or a saved .me230.json design. You can also drag files onto the window.',
+  'Open samples': 'Ready-wired course circuits (Quiz 2, HW3, labs, Arduino sketches) with the right analysis already set up.',
+  'Save': 'Download this design as a .me230.json file. Edits are also kept in this browser’s Guest Memory.',
+  'Print': 'Print the schematic (or save it as a PDF from the print dialog) for a lab report.',
+  'Cut': 'Remove the selected parts and wires and keep a copy to paste.',
+  'Copy': 'Copy the selected parts and wires; paste with Ctrl+V.',
+  'Paste': 'Place what you copied; it follows the pointer until you click.',
+  'Undo': 'Step back one edit.',
+  'Redo': 'Redo the edit you just undid.',
+  // View
+  'Full screen': 'Use the whole screen for the workspace. Esc returns.',
+  'Zoom in': 'Magnify the schematic. The mouse wheel zooms too.',
+  'Zoom out': 'Show more of the sheet.',
+  'Zoom to fit': 'Fit the whole circuit in the window.',
+  'Zoom sheet': 'Show the entire sheet, border included.',
+  'In-use list': 'Parts already in this design: pick one to place another of it without opening Select a Component.',
+  // Main
+  'Design Toolbox': 'Show or hide the panel listing your open designs.',
+  'Spreadsheet View': 'Show or hide the bottom panel: simulation results, nets, components and the simulation log.',
+  'SPICE Netlist Viewer': 'The text netlist the simulator actually runs. Handy for checking how parts are connected.',
+  'Grapher': 'The Grapher View: plots and tables from every analysis you have run, with cursors for reading values.',
+  'Analyses and simulation': 'Choose an analysis (DC Operating Point, AC Sweep, Transient, Fourier…), set its parameters and outputs, and run it.',
+  'Electrical rules check': 'Look for wiring mistakes: no ground, unconnected pins, floating probes, nets touching only one pin.',
+  'Active analysis': 'What Run (F5) does: Interactive runs live with meters and scopes; the others (Transient, AC Sweep, DC Operating Point…) run once and plot in the Grapher.',
+  // Simulation
+  'Run': 'Run the active analysis (chosen beside these buttons). Interactive Simulation runs live: meters, scopes and probes update as it goes.',
+  'Pause': 'Freeze the live simulation; Run or Pause again continues it.',
+  'Stop': 'End the live simulation.',
+  // Components (Select a Component opens at that group)
+  'Place Sources': 'DC, AC, pulse, step, piecewise linear, exponential and ABM sources, ground, and controlled sources.',
+  'Place Basic': 'Resistors, capacitors, inductors, potentiometers, switches (including the time-delay switch) and transformers.',
+  'Place Diodes': 'Rectifier, signal, zener and Schottky diodes, LEDs and bridge rectifiers.',
+  'Place Transistors': 'BJTs (NPN, PNP, Darlington), MOSFETs and JFETs.',
+  'Place Analog': 'Op-amps: 741, LM358, LM324, TL081 and ideal virtual op-amps.',
+  'Place TTL': 'TTL logic chips.', 'Place CMOS': 'CMOS logic chips.',
+  'Place MCU': 'Microcontrollers: the Arduino Uno, which runs your sketch against the circuit.',
+  'Place Advanced Peripherals': 'Keypads, displays and other peripherals.', 'Place Misc Digital': 'Other digital parts.', 'Place Mixed': 'Mixed-signal parts such as timers and converters.',
+  'Place Indicators': 'Voltmeters, ammeters, lamps and probes that show a reading right on the schematic.',
+  'Place Power': 'Power-electronics parts: the L298N motor driver and similar.', 'Place Misc': 'Miscellaneous parts.', 'Place RF': 'Radio-frequency parts.',
+  'Place Electro Mechanical': 'Motors: DC motor, hobby servo and the 28BYJ-48 stepper.',
+  'Place Connectors': 'On-page and global connectors: wires that join by name instead of being drawn.',
+  // Probe
+  'Voltage probe': 'Drop on a wire or pin to read its voltage (to ground) live: V, V(p-p), V(rms), V(dc) and frequency. Also an analysis output, V(PR1).',
+  'Current probe': 'Drop on a wire to read the current flowing through it: I, I(p-p), I(rms), I(dc).',
+  'Power probe': 'Reads the power into a part (not built yet).',
+  'Differential voltage probe': 'Reads the voltage between its two tips, not to ground: the voltage across one part.',
+  'Voltage and current probe': 'Sits in a wire and reads both the voltage there and the current through it.',
+  'Voltage reference probe': 'A reference point: other voltage probes can measure against it instead of ground.',
+  'Digital probe': 'A lamp that lights when its node is above the logic threshold.',
+  'Probe settings': 'Double-click any probe for its colour, reference probe and readout.',
+  // Instruments (drag their terminals onto the circuit, then double-click for the front panel)
+  'Multimeter': 'Measures voltage, current, resistance or dB, AC or DC. In parallel for volts, in series for amps.',
+  'Function generator': 'A signal source: sine, triangle or square wave with your frequency, amplitude, offset and duty cycle.',
+  'Wattmeter': 'Average power and power factor: voltage terminals across the load, current terminals in series with it.',
+  'Oscilloscope': 'Two-channel scope: voltage against time. Set the timebase (s/div) and each channel’s V/div.',
+  'Four channel oscilloscope': 'The same scope with four channels.',
+  'Bode plotter': 'Plots a circuit’s frequency response, gain and phase against frequency, from input to output.',
+  'Frequency counter': 'Measures the frequency, period, pulse widths and rise/fall times of a signal.',
+  'Word generator': 'Digital pattern source (not built yet).', 'Logic converter': 'Truth tables and Boolean expressions (not built yet).', 'Logic analyzer': 'Many digital channels against time (not built yet).',
+  'IV analyzer': 'Traces the current-voltage curves of a diode, BJT or MOSFET wired to it on its own.',
+  'Distortion analyzer': 'Total harmonic distortion (THD) or SINAD of a signal at the frequency you set.',
+  'Spectrum analyzer': 'The signal’s frequency content: amplitude against frequency.',
+  'Network analyzer': 'S-parameters of RF networks (not built yet).',
+  'Agilent function generator': 'The real 33120A bench generator, with its front panel and 50 Ω output.',
+  'Agilent multimeter': 'The real 34401A bench multimeter: DC/AC volts and amps, ohms, frequency, continuity, diode test.',
+  'Agilent oscilloscope': 'The real 54622D bench scope, with its softkeys, Quick Meas and cursors.',
+  'Tektronix oscilloscope': 'The real TDS 2024 four-channel scope, with MEASURE, AUTOSET, cursors and FFT.',
+  'LabVIEW instrument': 'LabVIEW virtual instruments (not built yet).', 'NI ELVISmx instrument': 'NI ELVIS lab-station instruments (not built yet).',
+  'Current clamp': 'Clamps around a wire and outputs a voltage proportional to its current, for a scope.',
+  // Grapher View
+  'Copy data': 'Copy the plotted numbers to the clipboard, to paste into a spreadsheet.',
+  'Properties': 'Graph Properties: title, axis labels and ranges, log scale, and each trace’s label and colour.',
+  'Show/hide grid': 'Turn the graph grid on or off.',
+  'Show/hide legend': 'Turn the legend (trace names) on or off.',
+  'Show/hide cursors': 'Two draggable cursors and a readout of x, y, dx, dy, dy/dx and 1/dx. Right-click a graph to jump a cursor to the next maximum or minimum.',
+  'Restore (zoom to fit)': 'Show the whole plot again after zooming (double-clicking the graph does the same).',
+  'Reverse colors': 'Switch between a white and a black plot background.',
+  'Export to CSV': 'Save the plotted data as a .csv file for Excel or MATLAB.',
+};
+// the tip for a button: its name without "(not available yet)" and the like
+const uiTipFor = (name) => UI_TIPS[String(name || '').replace(/\s*\((?:not available|no parts) yet\)$/, '')] || '';
+
 /* ===== src/ui/shell.js ===== */
 // shell.js — the application frame: menu bar, drop-down and context menus, toolbars, keyboard shortcuts and
 // floating windows (instrument front panels, dialogs, Grapher). Pure DOM, no framework.
+
 
 const h = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -7385,13 +7477,42 @@ function bindShortcuts(menus, extra = []) {
 
 /* ---------- toolbars ---------- */
 const tbItems = [];
+// ---------- button tips: the name (and shortcut) highlighted, then what the button is for ----------
+// buttons with a description get data-tip instead of title (so the browser's own tooltip doesn't cover it)
+function tipAttrs(name, key, tip = uiTipFor(name)) {
+  return tip ? { 'data-tipname': name, 'data-tipkey': key || null, 'data-tip': tip, 'aria-description': tip } : { title: name + (key ? ` (${key})` : '') };
+}
+let tipEl = null, tipFor = null, tipTimer = null, tipShownAt = -Infinity;
+function tipHide() { clearTimeout(tipTimer); tipFor = null; if (tipEl && !tipEl.hidden) { tipEl.hidden = true; tipShownAt = performance.now(); } }
+function tipShow(b) {
+  if (!tipEl) { tipEl = h('div', { class: 'uitip', role: 'tooltip', hidden: true }); document.body.append(tipEl); }
+  tipEl.textContent = '';
+  tipEl.append(h('b', { text: b.dataset.tipname }, ...(b.dataset.tipkey ? [h('span', { class: 'k', text: b.dataset.tipkey })] : [])), h('span', { text: b.dataset.tip }));
+  tipEl.hidden = false;
+  // below the button, or to its left for the vertical Instruments toolbar; kept inside the window
+  const r = b.getBoundingClientRect(), t = tipEl.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight, side = !!b.closest('.tbv');
+  let x = side ? r.left - t.width - 6 : r.left, y = side ? r.top : r.bottom + 6;
+  if (y + t.height > H - 4) y = r.top - t.height - 6;
+  tipEl.style.left = `${Math.max(4, Math.min(x, W - t.width - 4))}px`; tipEl.style.top = `${Math.max(4, y)}px`;
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerover', (e) => {
+    const b = e.target.closest && e.target.closest('[data-tip]');
+    if (b === tipFor) return;
+    tipHide(); if (!b) return;
+    tipFor = b;   // moving along a toolbar with a tip just shown: show at once, as native tooltips do
+    tipTimer = setTimeout(() => tipFor === b && b.isConnected && tipShow(b), performance.now() - tipShownAt < 600 ? 0 : 450);
+  });
+  for (const ev of ['pointerdown', 'keydown', 'wheel', 'blur']) window.addEventListener(ev, tipHide, true);
+  document.addEventListener('pointerout', (e) => { if (tipFor && !(e.relatedTarget && tipFor.contains(e.relatedTarget)) && tipFor.contains(e.target)) tipHide(); });
+}
 function buildToolbar(parent, name, items, vertical = false) {
   const bar = h('div', { class: vertical ? 'tbv' : 'tb', role: 'toolbar', 'aria-label': name, 'aria-orientation': vertical ? 'vertical' : null });
   bar.append(h('span', { class: 'grip' }));
   for (const it of items) {
     if (it === '|') { bar.append(h('span', { class: 'sep' })); continue; }
     if (it.el) { bar.append(it.el); continue; }
-    const b = h('button', { class: 'tbtn' + (it.wide ? ' wide' : ''), title: it.title + (it.key ? ` (${it.key})` : ''), 'aria-label': it.title, html: icon(it.icon) + (it.wide ? `<span>${it.wide}</span>` : '') });
+    const b = h('button', { class: 'tbtn' + (it.wide ? ' wide' : ''), ...tipAttrs(it.title, it.key, it.tip), 'aria-label': it.title, html: icon(it.icon) + (it.wide ? `<span>${it.wide}</span>` : '') });
     b.addEventListener('click', (e) => { e.currentTarget.blur(); if (!b.disabled) it.action(e); });
     tbItems.push({ b, it }); bar.append(b);
   }
@@ -7987,7 +8108,9 @@ function openGrapher(ctx, st) {
   const area = h('div', { class: 'garea' });
   const tb = h('div', { class: 'tb gtb', role: 'toolbar', 'aria-label': 'Grapher' });
   const page = () => G.pages[G.cur] || null;
-  const btn = (ic, title, fn, pressed) => { const b = h('button', { class: 'tbtn', title, 'aria-label': title, html: icon(ic), onclick: () => { fn(); sync(); } }); if (pressed) b.dataset.pressed = pressed; return b; };
+  // the Grapher's own words where a name means something else on the main toolbar
+  const GR_TIP = { 'Zoom in': 'Magnify the graph around its centre. Drag a box or use the wheel to zoom where you point.', 'Zoom out': 'Show more of the graph.', 'Print': 'Print this graph page.' };
+  const btn = (ic, title, fn, pressed) => { const b = h('button', { class: 'tbtn', ...tipAttrs(title, null, GR_TIP[title]), 'aria-label': title, html: icon(ic), onclick: () => { fn(); sync(); } }); if (pressed) b.dataset.pressed = pressed; return b; };
   const toggle = (k) => () => { G.opts[k] = !G.opts[k]; render(); };
   const zoomBy = (k) => () => { const p = page(); if (!p || !p.graphs) return; p.graphs.forEach((gph, i) => { const v = p.views[i] || grFullView(gph); const c = (v.x0 + v.x1) / 2, w = (v.x1 - v.x0) * k / 2; p.views[i] = { ...v, x0: c - w, x1: c + w, yAuto: true }; }); render(); };
   const restore = () => { const p = page(); if (p && p.views) p.views = p.views.map(() => null); render(); };
@@ -11722,7 +11845,7 @@ buildToolbar(tbs, 'Standard', [{ icon: 'new', title: 'New', key: 'Ctrl+N', actio
 buildToolbar(tbs, 'View', [{ icon: 'full', title: 'Full screen', action: fullScreen },
   { icon: 'zoomIn', title: 'Zoom in', action: () => zoomBy(1 / 1.25) }, { icon: 'zoomOut', title: 'Zoom out', action: () => zoomBy(1.25) },
   { icon: 'zoomArea', title: 'Zoom to fit', action: () => cur && fitView(cur) }, { icon: 'zoomFit', title: 'Zoom sheet', action: () => cur && zoomSheet(cur) }]);
-const inUse = h('select', { 'aria-label': 'In-use list', title: 'In-use list: parts already in this design' });
+const inUse = h('select', { 'aria-label': 'In-use list', ...tipAttrs('In-use list') });
 const fillInUse = () => {
   const seen = new Map();
   if (cur) for (const p of cur.doc.parts) { if (p.type === 'imported' || p.type === 'ground' || !LIBRARY[p.type] || notBom(p)) continue; const cm = componentOf(p); const k = cm ? cm.id : p.type; if (!seen.has(k)) seen.set(k, { cm, p }); }
@@ -11734,7 +11857,7 @@ fillInUse();
 buildToolbar(tbs, 'Main', [{ icon: 'toolbox', title: 'Design Toolbox', action: () => { prefs.toolbox = !prefs.toolbox; savePrefs(); applyLayout(); }, pressed: () => prefs.toolbox },
   { icon: 'sheet', title: 'Spreadsheet View', action: () => { prefs.spreadsheet = !prefs.spreadsheet; savePrefs(); applyLayout(); }, pressed: () => prefs.spreadsheet },
   { icon: 'netlist', title: 'SPICE Netlist Viewer', action: () => openNetlistWin() }, { icon: 'grapher', title: 'Grapher', action: () => cur && openGrapher(ctx, cur) }, { icon: 'analyses', title: 'Analyses and simulation', action: () => cur && openAnalysesDialog(ctx, cur) }, { icon: 'erc', title: 'Electrical rules check', action: () => cur && erc(cur) }, { el: inUse }]);
-const activeSel = h('select', { 'aria-label': 'Active analysis', title: 'Active analysis' }, ...ANALYSES.filter((a) => a.run).map((a) => h('option', { value: a.id, text: a.id === 'interactive' ? 'Interactive' : a.label })));
+const activeSel = h('select', { 'aria-label': 'Active analysis', ...tipAttrs('Active analysis') }, ...ANALYSES.filter((a) => a.run).map((a) => h('option', { value: a.id, text: a.id === 'interactive' ? 'Interactive' : a.label })));
 activeSel.addEventListener('change', () => { if (cur) { const A = analysesOf(cur); A.active = activeSel.value; markDirty(cur); } activeSel.blur(); });
 const syncActive = () => { if (cur) activeSel.value = analysesOf(cur).active || 'interactive'; };
 buildToolbar(tbs, 'Simulation', [{ icon: 'run', title: 'Run', key: 'F5', action: () => runActive(), enabled: () => !!cur && !isRunning(cur) && engineOK !== false && !analysisBusy },

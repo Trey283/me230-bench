@@ -1,6 +1,8 @@
 # Test report
 
-**v1.15 (HW3: Laplace, transfer functions, Fourier; Multisim's PWL/EXP/ABM sources and TD switch): 377 tests, all passing.** 74 unit, 95 simulation, 208 in-browser.
+**v1.15 (HW3: Laplace, transfer functions, Fourier; Multisim's PWL/EXP/ABM sources and TD switch): 380 tests, all passing.** 74 unit, 95 simulation, 211 in-browser.
+
+**v1.16 button tips (+3 in-browser):** resting the pointer on any toolbar button (Standard, View, Main, Simulation, Components, Probe, Instruments, Grapher) shows a highlighted box with its name, shortcut and a sentence on what it is for, after 450 ms, or at once when sliding along a toolbar; the descriptions live in `src/ui/tips.js`. Buttons with a tip drop the native `title` so two tooltips never stack, and the tests select them by `aria-label`. Checked: all 72 buttons and selectors have a tip, Run shows "Run F5" and its description only after the delay, and it hides on leaving.
 
 **v1.15.1 Grapher cursor fixes (+5 in-browser):** cursors were stored as a fraction of the visible window, so zooming (box, wheel, double-click) slid them onto other x values and Set X outside the zoom clamped to the edge; they now hold their x value and are hidden while zoomed out of view. Y_MAX/Y_MIN from a right-click searched the first graph (Magnitude) even on the Phase graph. Double-click never restored the view, because each click rebuilt the canvas before the dblclick arrived. Checked against HW3 problem 10's v(t): drag to 1 s reads v(1), Set X at 0.25 s / 1.75 s, zoom keeps both, double-click restores, and Phase vs Magnitude Y_MAX.
 

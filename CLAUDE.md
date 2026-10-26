@@ -19,7 +19,7 @@ python3 tests/e2e/test_e2e.py    # in-browser tests, headless Chromium, about 6 
 ```
 - The in-browser tests need `pip install playwright` and `playwright install chromium`.
 - Build first: the in-browser tests load `dist/me230-bench.html`. Screenshots go to `tests/e2e/shots/`.
-- At v1.15 the counts are 74 unit, 95 simulation and 208 in-browser checks. Keep everything passing.
+- At v1.15 the counts are 74 unit, 95 simulation and 211 in-browser checks. Keep everything passing.
 
 ## How the bundle works (read before adding code)
 - `build.mjs` joins the ES modules in a fixed `order` list and strips `import` and `export` lines. It then runs
@@ -44,6 +44,8 @@ python3 tests/e2e/test_e2e.py    # in-browser tests, headless Chromium, about 6 
   - `src/ui/app.js`: `openPart` routing, the `INSTRUMENTS` toolbar table (null type = greyed), `stepFor` (the sim time
     step), `simVectors` (which vectors a live run records) and `scopeWindow` (trigger and window logic shared by every
     scope).
+  - Button tips (name + description on hover): `src/ui/tips.js` `UI_TIPS`, keyed by the button's name. A new toolbar
+    button needs an entry; `tipAttrs()` in `shell.js` applies it. Tests select buttons by `aria-label`, not `title`.
   - Front panels: `src/ui/panels.js` (Multisim's own instruments), `agilent.js`, `agilent2.js`, `tektronix.js` and
     `benchpanels.js`.
   - Pure reading functions: `src/benchinst.js`, `src/agilentinst.js` and `src/scopemeas.js`.

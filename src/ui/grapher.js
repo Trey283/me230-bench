@@ -1,6 +1,6 @@
 // grapher.js — Multisim's Grapher View: one tab per analysis run; graphs with grid, legend, two cursors and zoom;
 // tables for operating points and single-frequency results; export to CSV.
-import { h, WM, openMenu, message } from './shell.js';
+import { h, WM, openMenu, message, tipAttrs } from './shell.js';
 import { icon } from './icons.js';
 import { interp } from '../analysis.js';
 
@@ -34,7 +34,9 @@ export function openGrapher(ctx, st) {
   const area = h('div', { class: 'garea' });
   const tb = h('div', { class: 'tb gtb', role: 'toolbar', 'aria-label': 'Grapher' });
   const page = () => G.pages[G.cur] || null;
-  const btn = (ic, title, fn, pressed) => { const b = h('button', { class: 'tbtn', title, 'aria-label': title, html: icon(ic), onclick: () => { fn(); sync(); } }); if (pressed) b.dataset.pressed = pressed; return b; };
+  // the Grapher's own words where a name means something else on the main toolbar
+  const GR_TIP = { 'Zoom in': 'Magnify the graph around its centre. Drag a box or use the wheel to zoom where you point.', 'Zoom out': 'Show more of the graph.', 'Print': 'Print this graph page.' };
+  const btn = (ic, title, fn, pressed) => { const b = h('button', { class: 'tbtn', ...tipAttrs(title, null, GR_TIP[title]), 'aria-label': title, html: icon(ic), onclick: () => { fn(); sync(); } }); if (pressed) b.dataset.pressed = pressed; return b; };
   const toggle = (k) => () => { G.opts[k] = !G.opts[k]; render(); };
   const zoomBy = (k) => () => { const p = page(); if (!p || !p.graphs) return; p.graphs.forEach((gph, i) => { const v = p.views[i] || grFullView(gph); const c = (v.x0 + v.x1) / 2, w = (v.x1 - v.x0) * k / 2; p.views[i] = { ...v, x0: c - w, x1: c + w, yAuto: true }; }); render(); };
   const restore = () => { const p = page(); if (p && p.views) p.views = p.views.map(() => null); render(); };
