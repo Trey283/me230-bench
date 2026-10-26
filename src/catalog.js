@@ -36,17 +36,24 @@ export const CATALOG = [
       cmp('AC_VOLTAGE', 'acvoltage', {}, 'AC voltage source (peak voltage, frequency, phase)'),
       cmp('CLOCK_VOLTAGE', 'clock', {}, 'Clock (square wave) voltage source'),
       cmp('DC_INTERACTIVE_VOLTAGE', 'dcinteractive', {}, 'DC voltage you change with a key while the simulation runs'),
+      cmp('EXPONENTIAL_VOLTAGE', 'expvoltage', {}, 'Exponential voltage (SPICE EXP: initial and pulsed value, delays, time constants)'),
+      cmp('PIECEWISE_LINEAR_VOLTAGE', 'pwlvoltage', {}, 'Piecewise linear voltage: straight lines between (time, voltage) points, optionally repeated'),
       cmp('PULSE_VOLTAGE', 'pulse', {}, 'Pulse voltage source (initial/pulsed value, delay, rise, fall, width, period)'),
       cmp('STEP_VOLTAGE', 'step', {}, 'Step voltage source'),
       cmp('SQUARE_TRIANGLE_SINE_VOLTAGE', 'funcgen', {}, 'Sine, square or triangle voltage (as used by the lab starters)') ] },
     { family: 'SIGNAL_CURRENT_SOURCES', comps: [
       cmp('AC_CURRENT', 'accurrent', {}, 'AC current source (peak current, frequency, phase)'),
       cmp('DC_CURRENT', 'dccurrent', {}, 'DC current source; current leaves at the arrow'),
-      cmp('DC_INTERACTIVE_CURRENT', 'dciinteractive', {}, 'DC current you change with a key while the simulation runs') ] },
+      cmp('DC_INTERACTIVE_CURRENT', 'dciinteractive', {}, 'DC current you change with a key while the simulation runs'),
+      cmp('EXPONENTIAL_CURRENT', 'expcurrent', {}, 'Exponential current (SPICE EXP); 6e^-2t u(t) A is initial 6, pulsed 0, rise time constant 0.5'),
+      cmp('PIECEWISE_LINEAR_CURRENT', 'pwlcurrent', {}, 'Piecewise linear current between (time, current) points'),
+      cmp('PULSE_CURRENT', 'pulsecurrent', {}, 'Pulse current source (initial/pulsed value, delay, rise, fall, width, period)') ] },
     { family: 'CONTROLLED_VOLTAGE_SOURCES', comps: [
+      cmp('ABM_VOLTAGE', 'abmvoltage', {}, 'Voltage from any expression of TIME, node voltages V(N1) and currents I(V1)'),
       cmp('CURRENT_CONTROLLED_VOLTAGE_SOURCE', 'ccvs', {}, 'Output voltage = H x control current'),
       cmp('VOLTAGE_CONTROLLED_VOLTAGE_SOURCE', 'vcvs', {}, 'Output voltage = E x control voltage') ] },
     { family: 'CONTROLLED_CURRENT_SOURCES', comps: [
+      cmp('ABM_CURRENT', 'abmcurrent', {}, 'Current from any expression, e.g. 36m*TIME*exp(-6*TIME) for 36t e^-6t mA'),
       cmp('CURRENT_CONTROLLED_CURRENT_SOURCE', 'cccs', {}, 'Output current = F x control current'),
       cmp('VOLTAGE_CONTROLLED_CURRENT_SOURCE', 'vccs', {}, 'Output current = G x control voltage') ] } ] },
   { group: 'Basic', icon: 'cbasic', families: [
@@ -65,7 +72,8 @@ export const CATALOG = [
       cmp('PB_NC', 'pushbutton', { nc: 'yes' }, 'Push button, normally closed (opens while its key is held)'),
       cmp('PB_NO', 'pushbutton', { nc: 'no' }, 'Push button, normally open (closes while its key is held)'),
       cmp('SPDT', 'spdt', {}, 'Single-pole double-throw switch'),
-      cmp('SPST', 'spst', {}, 'Single-pole single-throw switch') ] },
+      cmp('SPST', 'spst', {}, 'Single-pole single-throw switch'),
+      cmp('TD_SW1', 'tdsw', { ton: '0', toff: '1e9' }, 'Time-delay switch: closes at TON and opens at TOFF (a switch that closes at t = 0)') ] },
     { family: 'TRANSFORMER', comps: [
       cmp('1P1S', 'transformer', { N: '2' }, 'Transformer, one primary and one secondary winding'),
       cmp('TS_IDEAL', 'transformer', { N: '1', Lm: '100' }, 'Near-ideal transformer (1:1)') ] } ] },

@@ -23,6 +23,9 @@ const syDiodeBody = (bar) => [sG([[-6, -6], [-6, 6], [6, 0]], 'ink', 'solid'), .
 
 // vertical sources between (0,-y) and (0,y): a circle of radius r with leads
 const sySrcCircle = (y, r) => [sL([0, -y], [0, -r]), sL([0, r], [0, y]), sC(0, 0, r)];
+const syISrc = () => [...sySrcCircle(27, 18), sL([-5, 11], [-5, -8]), syArrowHead(-5, -12, 0, -1, 5)];
+// a rise then an exponential decay
+const syExp = () => { const p = [[-11, 7], [-7, 7], [-7, -7]]; for (let i = 1; i <= 8; i++) p.push([+(-7 + i * 2.25).toFixed(2), +(7 - 14 * Math.exp(-i / 2.2)).toFixed(2)]); return { k: 'l', p }; };
 
 export const SYMBOLS = {
   resistor: () => [...syTwoLead(-13.5, 13.5), syZigzag(-13.5, 13.5)],
@@ -47,6 +50,14 @@ export const SYMBOLS = {
   clocksrc: () => [...sySrcCircle(27, 18), sL([-9, 5], [-9, -5], [0, -5], [0, 5], [9, 5], [9, -5]), sT(-14, -27, '+', { size: 9 })],
   pulsesrc: () => [...sySrcCircle(27, 18), sL([-10, 6], [-5, 6], [-5, -6], [3, -6], [3, 6], [10, 6]), sT(-14, -27, '+', { size: 9 })],
   stepsrc: () => [...sySrcCircle(27, 18), sL([-10, 6], [-1, 6], [-1, -6], [10, -6]), sT(-14, -27, '+', { size: 9 })],
+  pwlsrc: () => [...sySrcCircle(27, 18), sL([-11, 6], [-5, -6], [1, 2], [5, -3], [11, 6]), sT(-14, -27, '+', { size: 9 })],
+  expsrc: () => [...sySrcCircle(27, 18), syExp(), sT(-14, -27, '+', { size: 9 })],
+  abmsrc: () => [sL([0, -27], [0, -18]), sL([0, 18], [0, 27]), sG([[0, -18], [18, 0], [0, 18], [-18, 0]], null), sT(0, -12, '+', { size: 11, bold: true }), sT(0, 3, '−', { size: 11, bold: true })],
+  // current versions: the arrow (current leaves at pin 1) beside a small waveform
+  pulseisrc: () => [...syISrc(), sL([2, 5], [5, 5], [5, -5], [10, -5], [10, 5], [13, 5])],
+  pwlisrc: () => [...syISrc(), sL([2, 5], [6, -5], [9, 1], [13, -4])],
+  expisrc: () => [...syISrc(), { k: 'l', p: syExp().p.map(([x, y]) => [+(7.5 + x * 0.5).toFixed(2), +(y * 0.8).toFixed(2)]) }],
+  abmisrc: () => [sL([0, -27], [0, -18]), sL([0, 18], [0, 27]), sG([[0, -18], [18, 0], [0, 18], [-18, 0]], null), sL([0, 10], [0, -7]), syArrowHead(0, -11, 0, -1, 5)],
   dcinteractive: () => [...sySrcCircle(27, 18), sT(0, -14, '+', { size: 11, bold: true }), sT(0, 3, '−', { size: 11, bold: true }), sL([-15, 15], [14, -14]), syArrowHead(15, -15, 1, -1, 5)],
   isrc: () => [...sySrcCircle(18, 12), sL([0, 7], [0, -5]), syArrowHead(0, -8, 0, -1, 4)],
   acisrc: () => [...sySrcCircle(27, 18), sL([0, 12], [0, -9]), syArrowHead(0, -13, 0, -1, 5), sySine(-1, 3, 10, 3)],
@@ -62,6 +73,9 @@ export const SYMBOLS = {
     [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, 0, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, 0], [18, 0]), { ...sL([-11.5, -1], [12, -2]), cls: 'lever' }]],
   spdt: () => { const base = [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, -9, 2.2, '#fff'), sC(13.5, 9, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, -9], [18, -9]), sL([15.7, 9], [18, 9])];
     return [[...base, { ...sL([-11.5, -0.5], [11.5, -8]), cls: 'lever' }], [...base, { ...sL([-11.5, 0.5], [11.5, 8]), cls: 'lever' }]]; },
+  // time-delay switch: an SPST with a clock over the lever
+  tdsw: () => [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, 0, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, 0], [18, 0]), { ...sL([-11.5, -1], [12, -7]), cls: 'lever' },
+    sC(0, -9, 4, '#fff'), sL([0, -12], [0, -9], [2.5, -9])],
   pushbutton: (nc) => { const base = [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, 0, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, 0], [18, 0])];
     const bar = (y) => [{ ...sL([-13.5, y], [13.5, y]), cls: 'lever' }, sL([0, y], [0, y - 8]), sL([-4, y - 8], [4, y - 8])];
     return nc ? [[...base, ...bar(2.5)], [...base, ...bar(-6)]] : [[...base, ...bar(-6)], [...base, ...bar(2.5)]]; },

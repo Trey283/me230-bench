@@ -105,3 +105,30 @@ test('transistors switch: 2N7000 on at Vgs = 5 V, TIP120 Darlington saturates on
 test('every library kind has its defaults and draws', () => {
   for (const k of Object.keys(LIBRARY)) { const p = defaults(k); LIBRARY[k].spice(p, 'X1'); if (LIBRARY[k].sym) assert.ok(partSymbol(k, p), k); }
 });
+
+test('PWL, exponential, pulse-current, ABM sources and the time-delay switch (Multisim source library)', async () => {
+  const load = (type, params, rot = 0) => circuit([['S', type, 0, 0, params, rot], ['R', 'resistor', 108, 0, { R: '1' }, 1], ['G', 'ground', 0, 108]], [['S', '1', 'R', '1'], ['R', '2', 'G', '1'], ['S', '2', 'G', '1']]);
+  const at = (V, n, q) => { const t = V.get('time'), y = V.get(`v(${n.toLowerCase()})`), k = t.findIndex((x) => x >= q); return y[k - 1] + (y[k] - y[k - 1]) * (q - t[k - 1]) / (t[k] - t[k - 1]); };
+  // a repeated time is a vertical step; Repeat data repeats the table
+  let C = load('pwlvoltage', { pts: '0 10, 2 0, 2 -10, 4 0', rep: 'yes' }), V = await tran(C.nl, '1m', '6');
+  near(at(V, C.net('R', '1'), 1), 5, 1e-3, 'pwl at 1 s'); near(at(V, C.net('R', '1'), 2.5), -7.5, 1e-3, 'after the step'); near(at(V, C.net('R', '1'), 5), 5, 1e-3, 'repeated');
+  // currents leave at pin 1, into the 1 Ω load: v = i
+  C = load('expcurrent', { V1: '6', V2: '0', td1: '0', tau1: '0.5', td2: '1e9', tau2: '1' }); V = await tran(C.nl, '1m', '1');
+  near(at(V, C.net('R', '1'), 0.5), 6 * Math.exp(-1), 2e-3, '6e^-2t at 0.5 s (starts at t = 0)');
+  C = load('pulsecurrent', { V1: '0', V2: '2', td: '1m', tr: '1n', tf: '1n', pw: '1m', per: '4m' }); V = await tran(C.nl, '10u', '4m');
+  near(at(V, C.net('R', '1'), 0.5e-3), 0, 1e-6, 'before the pulse'); near(at(V, C.net('R', '1'), 1.5e-3), 2, 1e-6, 'pulsed value');
+  C = load('abmcurrent', { expr: '36m*TIME*exp(-6*TIME)' }); V = await tran(C.nl, '1m', '1');
+  near(at(V, C.net('R', '1'), 1 / 6), 0.036 / 6 * Math.exp(-1), 1e-6, 'ABM current 36t e^-6t mA');
+  C = load('abmvoltage', { expr: '2 * V(N9) + 5 * exp(-TIME / 1m)' }); assert.match(C.nl, /^bV1 \S+ \S+ v=2\*V\(N9\)\+5\*exp\(-TIME\/1e-3\)$/m, 'spaces out, suffixes as exponents');
+  C = load('abmvoltage', { expr: '5*u(TIME-1m)' }); V = await tran(C.nl, '10u', '2m');
+  near(at(V, C.net('R', '1'), 0.5e-3), 0, 1e-6, 'u() before'); near(at(V, C.net('R', '1'), 1.5e-3), 5, 1e-6, 'u() after');
+  // TD_SW1: TON = 0 is open at the operating point and closed right after; TON < TOFF closes then opens
+  const sw = (ton, toff) => circuit([['V', 'dcvoltage', 0, 0, { V: '1' }], ['J', 'tdsw', 90, -36, { ton, toff }], ['R', 'resistor', 180, 18, { R: '1k' }, 1], ['G', 'ground', 0, 108]],
+    [['V', '1', 'J', '1'], ['J', '2', 'R', '1'], ['R', '2', 'G', '1'], ['V', '2', 'G', '1']]);
+  C = sw('0', '1e9'); near(v(await op(C.nl), C.net('R', '1')), 0, 1e-6, 'TON = 0: open at the operating point');
+  V = await tran(C.nl, '1u', '1m'); near(at(V, C.net('R', '1'), 0.5e-3), 1, 1e-4, 'closed after t = 0');
+  C = sw('1m', '2m'); V = await tran(C.nl, '10u', '3m');
+  near(at(V, C.net('R', '1'), 0.5e-3), 0, 1e-6, 'open before TON'); near(at(V, C.net('R', '1'), 1.5e-3), 1, 1e-4, 'closed'); near(at(V, C.net('R', '1'), 2.5e-3), 0, 1e-6, 'open after TOFF');
+  C = sw('2m', '1m'); V = await tran(C.nl, '10u', '3m');
+  near(at(V, C.net('R', '1'), 0.5e-3), 1, 1e-4, 'TOFF < TON: closed first'); near(at(V, C.net('R', '1'), 1.5e-3), 0, 1e-6, 'open'); near(at(V, C.net('R', '1'), 2.5e-3), 1, 1e-4, 'closed again');
+});

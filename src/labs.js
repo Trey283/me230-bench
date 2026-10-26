@@ -18,6 +18,12 @@ export const LABS = [
   { id: 'q2-impedance', title: 'Quiz 2: AC impedance reduction network', build: quiz2Impedance },
   { id: 'q2-rc-switch', title: 'Quiz 2: switched RC charge/discharge', build: quiz2RcSwitch },
   { id: 'q2-rlc-damping', title: 'Quiz 2: RLC damping comparison', build: quiz2RlcDamping },
+  { id: 'hw3-fourier', title: 'HW3: Fourier series of a sawtooth (problem 1)', build: hw3Fourier },
+  { id: 'hw3-rl-switch', title: 'HW3: switched two-loop RL circuit (problem 2)', build: hw3RlSwitch },
+  { id: 'hw3-bandpass', title: 'HW3: RLC band-pass frequency response (problem 4)', build: hw3Bandpass },
+  { id: 'hw3-step', title: 'HW3: step response v(t) by Laplace (problem 10)', build: hw3Step },
+  { id: 'hw3-abm', title: 'HW3: 36t e^-6t mA current source (problem 11)', build: hw3Abm },
+  { id: 'hw3-exp', title: 'HW3: 6e^-2t A current source into RLC (problem 12)', build: hw3Exp },
   { id: 'lab2', title: 'Lab 2: voltage divider', build() {
     const { d, at, w } = builder('Lab 2: voltage divider');
     at('dcvoltage', 0, 4, 0, { V: '12' }); at('resistor', 8, 0, 1, { R: '1k' }); at('resistor', 8, 4, 1, { R: '2k' });
@@ -148,6 +154,64 @@ function quiz2RcSwitch() {
   });
 }
 
+// HW3: Laplace-transform and Fourier problems; each sample's note gives the hand solution the simulation should match
+const hw3Tran = (tstop, tmax, out, ic = 'zero') => ({ tran: { ic, tstart: '0', tstop, tmaxAuto: false, tmax, tstepAuto: true, tstep: '1e-05', out } });
+function hw3Fourier() {
+  const { d, at } = builder('HW3: Fourier series of a sawtooth', 28, 20);
+  note(at, 0, -15, 'Problem 1 — T = 4 s, half-wave symmetric: odd harmonics only, a_n = 40/(n²π²), b_n = 20/(nπ).', '10');
+  note(at, 0, -12, 'Fourier analysis is ready (f0 = 0.25 Hz). Expected |H1| = 7.547, |H3| = 2.169, even harmonics 0.', '10');
+  const v = at('pwlvoltage', 0, 5, 0, { pts: '0 10, 2 0, 2 -10, 4 0', rep: 'yes' }), r = at('resistor', 14, 5, 1, { R: '1k' }), p = at('mvprobe', 14, 2, 0, { color: 'Red' }), g = at('ground', 4, 11);
+  connect(d, v, '1', r, '1'); connect(d, r, '1', p, '1'); connect(d, r, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'fourier', { fourier: { f0: '0.25', harmonics: '9', tstop: '', out: ['V(PR1)'] }, ...hw3Tran('8', '1m', ['V(PR1)']) });
+}
+function hw3RlSwitch() {
+  const { d, at } = builder('HW3: switched two-loop RL circuit', 28, 20);
+  note(at, 0, -15, 'Problem 2 — J1 closes at t = 0 (TD_SW1, TON = 0) with both inductor currents zero. Transient is ready.', '10');
+  note(at, 0, -12, 'Laplace: i1 = 15 − 14e^(−2t) − e^(−12t) A in L1;  i2 = 7 − 8.4e^(−2t) + 1.4e^(−12t) A in L2.', '10');
+  const v = at('dcvoltage', 0, 5, 0, { V: '336' }), sw = at('tdsw', 7, 0, 0, { ton: '0', toff: '1e9' }), l1 = at('inductor', 14, 0, 0, { L: '8.4' });
+  const r1 = at('resistor', 20, 5, 1, { R: '42' }), l2 = at('inductor', 26, 0, 0, { L: '10' }), r2 = at('resistor', 32, 5, 1, { R: '48' }), g = at('ground', 8, 11);
+  connect(d, v, '1', sw, '1'); connect(d, sw, '2', l1, '1'); connect(d, l1, '2', r1, '1'); connect(d, l1, '2', l2, '1'); connect(d, l2, '2', r2, '1');
+  connect(d, r1, '2', g, '1'); connect(d, r2, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('3', '1m', ['I(L1)', 'I(L2)'], 'auto'));
+}
+function hw3Bandpass() {
+  const { d, at } = builder('HW3: RLC band-pass', 28, 20);
+  note(at, 0, -15, 'Problem 4 — series RLC band-pass, output across R. AC Sweep is ready (1 Hz to 1 kHz).', '10');
+  note(at, 0, -12, 'H(s) = (R/L)s / (s² + (R/L)s + 1/LC): ω0 = 192.5 rad/s (30.63 Hz), |H| = 1 there, bandwidth R/L = 11.1 rad/s.', '10');
+  const v = at('acvoltage', 0, 5, 0, { A: '1', acm: '1', f: '30.63' }), l = at('inductor', 13, 1, 0, { L: '2.7' }), c = at('capacitor', 20, 1, 0, { C: '10u' });
+  const r = at('resistor', 27, 5, 1, { R: '30' }), p = at('mvprobe', 27, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', l, '1'); connect(d, l, '2', c, '1'); connect(d, c, '2', r, '1'); connect(d, r, '1', p, '1'); connect(d, r, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'ac', { ac: { fstart: '1', fstop: '1k', sweep: 'dec', points: '200', vscale: 'lin', out: ['V(PR1)'] } });
+}
+function hw3Step() {
+  const { d, at } = builder('HW3: step response by Laplace', 28, 20);
+  note(at, 0, -15, 'Problem 10 — vs = 2u(t) V, R1 = 1 Ω, C = 0.3689 F, R2 = 3 Ω, L = 0.2259 H. Transient from rest is ready.', '10');
+  note(at, 0, -12, 'V(s) = 24(3 + 0.2259s) / [s(s + 4)(s + 12)]  →  v(t) = 1.5 − 1.572e^(−4t) + 0.072e^(−12t) V.', '10');
+  const v = at('step', 0, 5, 0, { V0: '0', V1: '2', ts: '0', tr: '1n' }), r1 = at('resistor', 9, 1, 0, { R: '1' }), c = at('capacitor', 15, 5, 1, { C: '0.3689' });
+  const r2 = at('resistor', 33, 1, 0, { R: '3' }), l = at('inductor', 39, 5, 1, { L: '0.2259' }), p = at('mvprobe', 15, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', c, '1'); connect(d, c, '1', p, '1'); connect(d, r1, '2', r2, '1'); connect(d, r2, '2', l, '1');
+  connect(d, c, '2', g, '1'); connect(d, l, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('2', '1m', ['V(PR1)']));
+}
+function hw3Abm() {
+  const { d, at } = builder('HW3: 36t e^-6t mA current source', 28, 20);
+  note(at, 0, -15, 'Problem 11 — is(t) = 36t e^(−6t) mA (ABM current source), R1 = 2 Ω, C = 1/8 F, R2 = 4 Ω, all in parallel.', '10');
+  note(at, 0, -12, 'V(s) = 8 Is/(s + 6) = 0.288/(s + 6)³  →  i(t) = v/4 = 36t² e^(−6t) mA (peak 0.541 mA at t = 1/3 s).', '10');
+  const s = at('abmcurrent', 0, 5, 0, { expr: '36m*TIME*exp(-6*TIME)' }), r1 = at('resistor', 27, 5, 1, { R: '2' }), c = at('capacitor', 33, 5, 1, { C: '0.125' });
+  const r2 = at('resistor', 39, 5, 1, { R: '4' }), g = at('ground', 8, 11);
+  connect(d, s, '1', r1, '1'); connect(d, r1, '1', c, '1'); connect(d, c, '1', r2, '1'); connect(d, s, '2', g, '1'); connect(d, r1, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, r2, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('3', '1m', ['I(R2)']));
+}
+function hw3Exp() {
+  const { d, at } = builder('HW3: 6e^-2t A current source into RLC', 28, 20);
+  note(at, 0, -15, 'Problem 12 — is(t) = 6e^(−2t) u(t) A (EXPONENTIAL_CURRENT: initial 6, pulsed 0, rise time constant 0.5 s).', '10');
+  note(at, 0, -12, 'R1 = 10 Ω, R2 = 5 Ω, L = 0.6196 H, LC = 1/15 s² (C = 0.10759 F). Transient from rest plots iL = I(L1).', '10');
+  const s = at('expcurrent', 0, 5, 0, { V1: '6', V2: '0', td1: '0', tau1: '0.5', td2: '1e9', tau2: '1' }), r1 = at('resistor', 14, 5, 1, { R: '10' });
+  const c = at('capacitor', 20, 1, 0, { C: '0.10759' }), r2 = at('resistor', 26, 5, 1, { R: '5' }), l = at('inductor', 32, 5, 1, { L: '0.6196' }), g = at('ground', 8, 11);
+  connect(d, s, '1', r1, '1'); connect(d, r1, '1', c, '1'); connect(d, c, '2', r2, '1'); connect(d, r2, '1', l, '1');
+  connect(d, s, '2', g, '1'); connect(d, r1, '2', g, '1'); connect(d, r2, '2', g, '1'); connect(d, l, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('5', '1m', ['I(L1)']));
+}
 function quiz2RlcDamping() {
   const b = builder('Quiz 2: RLC damping comparison', 28, 20), { d, at } = b;
   note(at, 0, -7, 'Problem 8 — Parameter Sweep is ready for R1 = 10, 100, 400, and 2200 Ohm.', '10');

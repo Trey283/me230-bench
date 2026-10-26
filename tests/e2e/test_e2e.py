@@ -1,7 +1,7 @@
 """End-to-end tests: the built page in headless Chromium, driven the way a person uses Multisim.
 Run:  python3 tests/e2e/test_e2e.py      (after `node build.mjs`)
 """
-import json, os, re, sys, time, pathlib
+import json, math, os, re, sys, time, pathlib
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -525,7 +525,7 @@ with sync_playwright() as p:
     check('Open samples lists all five Quiz 2 review circuits', q2 == ['q2-ac-cap', 'q2-mesh', 'q2-impedance', 'q2-rc-switch', 'q2-rlc-damping'], str(q2))
     pg.keyboard.press('Escape')
     bad = []
-    for lab in [l for l in labs if l != 'lab6' and not l.startswith('q2-')]:
+    for lab in [l for l in labs if l != 'lab6' and not l.startswith(('q2-', 'hw3-'))]:   # those open on an offline analysis
         pg.evaluate('id => window.__bench.openLab(id)', lab); pg.wait_for_timeout(100)
         run(pg, 0.4)
         if 'Simulating' not in msg(pg) or pg.locator('#sch .part').count() < 3: bad.append(f'{lab}: {msg(pg)}')
@@ -563,6 +563,40 @@ with sync_playwright() as p:
     check('Quiz 2 problem 8: F5 plots underdamped through overdamped RLC cases', len(damp) == 4 and damp[0]['hi'] > 9 and damp[0]['lo'] < -4 and damp[2]['hi'] < 5.01 and damp[2]['lo'] > -0.01 and damp[3]['hi'] <= 5.001 and damp[3]['lo'] > -1e-3, str(damp))
     win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
 
+    # ---------------- HW3 samples (Laplace / Fourier), the new sources, probe snapping ----------------
+    menu(pg, 'File', 'Open samples...')
+    hw = pg.eval_on_selector_all('.win [data-lab^="hw3-"]', 'bs => bs.map(b => b.dataset.lab)')
+    pg.keyboard.press('Escape')
+    check('Open samples lists the six HW3 circuits', hw == ['hw3-fourier', 'hw3-rl-switch', 'hw3-bandpass', 'hw3-step', 'hw3-abm', 'hw3-exp'], str(hw))
+    pg.evaluate("() => window.__bench.openLab('hw3-rl-switch')"); pg.wait_for_timeout(150)
+    an_run()
+    tr = pg.evaluate("() => window.__bench.current().grapher.pages.at(-1).graphs[0].traces.map(t => { const k = t.x.findIndex(x => x >= 0.5); return Math.abs(t.y[k]); })")
+    check('HW3 problem 2: the time-delay switch gives i1(0.5) = 15 − 14e^−1 − e^−6 A', abs(tr[0] - (15 - 14 * math.exp(-1) - math.exp(-6))) < 0.03, str(tr))
+    win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
+    pg.evaluate("() => window.__bench.openLab('hw3-abm')"); pg.wait_for_timeout(150)
+    an_run()
+    pk = pg.evaluate("() => { const t = window.__bench.current().grapher.pages.at(-1).graphs[0].traces[0]; return Math.max(...t.y.map(Math.abs)); }")
+    check('HW3 problem 11: the ABM current source gives a 0.541 mA peak in R2', abs(pk - 0.036 / 9 * math.exp(-2)) < 2e-6, str(pk))
+    win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
+    pg.evaluate("() => window.__bench.openLab('hw3-step')"); pg.wait_for_timeout(150)
+    cx, cy = pg.evaluate("() => { const st = window.__bench.current(), s = st.drawing.symbols.find(s => s.ref === 'C1'), p = s.pins.find(q => q.name === '1'); return [p.x, p.y]; }")
+    menu(pg, 'Place', 'Probe', 'Voltage')
+    x, y = scr(pg, [cx + 9, cy - 9]); pg.mouse.move(x, y); pg.wait_for_timeout(50); pg.mouse.click(x, y); pg.wait_for_timeout(150)
+    x, y = scr(pg, [cx + 90, cy + 120]); pg.mouse.move(x, y); pg.wait_for_timeout(50); pg.mouse.click(x, y); pg.wait_for_timeout(150)   # on screen, clear of every wire
+    hint = msg(pg); pg.keyboard.press('Escape'); pg.wait_for_timeout(80)
+    pr = nets(pg)
+    check('a voltage probe dropped a grid square off a wire snaps onto its node', pr.get('PR2', {}).get('1') == pr['C1']['1'], str(pr.get('PR2')))
+    check('one dropped far from every wire says it reads nothing', pr.get('PR3', {}).get('1') == '?' and 'PR3 isn’t on a wire or pin' in hint, hint)
+    pg.click('#toolbars button[aria-label="Electrical rules check"]'); pg.wait_for_timeout(150)
+    erc = pg.evaluate("() => window.__bench.current().results.map(r => r.text)")
+    check('ERC names the floating probe', any('Probe PR3' in t for t in erc), str(erc))
+    # the original bug: a Transient with V() of a floating probe named it instead of "didn't produce results"
+    pg.evaluate("() => { const st = window.__bench.current(); st.doc.analyses.tran.out = ['V(PR3)']; }")
+    pg.keyboard.press('F5')
+    pg.wait_for_function("() => document.getElementById('stMsg').textContent.includes('PR3')", timeout=30000); pg.wait_for_timeout(150)
+    box = win(pg, 'Transient'); err = box.inner_text()
+    check('Transient with V(PR3) on a floating probe names the probe (not “didn’t produce results”)', 'V(PR3): the probe isn’t connected' in err and 'didn' not in err, err)
+    box.locator('button:text-is("OK")').click(); pg.wait_for_timeout(80)
     pg.evaluate("() => window.__bench.openLab('lab6')"); pg.wait_for_timeout(200)
     menu(pg, 'MCU', 'Arduino sketch...')
     check('Lab 6: MCU » Arduino sketch opens the sketch', 'digitalRead' in pg.input_value('#sketch'), str(wins(pg)))

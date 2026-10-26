@@ -25,7 +25,7 @@ import { MEMORY_LIMITS, memoryNewId, memoryJsonBytes, memoryListCircuits, memory
   memoryGetSetting, memorySetSetting, memoryDeleteSetting, memoryGenerateCode, memoryFormatCode, memoryNewLocker, memoryUpsertLockerDesign,
   memoryRemoveLockerDesign, memoryCreateVault, memoryLoadVault, memorySaveVault, memoryDeleteVault } from '../storage.js';
 import { newDoc, fromImported, toCircuit, toDrawing, addPart, rotatePart, rotatePartCCW, flipPart, deletePart, deleteWire, addWire, snap,
-  moveSelection, copySelection, pasteClip, partBox, replacePart, nextRef, insertInline, connect } from '../model.js';
+  moveSelection, copySelection, pasteClip, partBox, replacePart, nextRef, insertInline, snapProbe, connect } from '../model.js';
 import { toNetlist, timeScales, meterVectorName, setAcDrive, num } from '../netlist.js';
 import { describe, sweepSources, meterNumber } from '../instruments.js';
 import { windowStats, bodeFromAc } from '../analysis.js';
@@ -70,7 +70,8 @@ const prefs = (() => { const d = { wheel: 'zoom', realtime: true, toolbox: true,
 const savePrefs = () => { try { localStorage.setItem('me230.prefs', JSON.stringify(prefs)); } catch { /* per-viewer convenience only */ } };
 function status(msg, err = false) { const s = $('stMsg'); s.textContent = msg; s.classList.toggle('err', !!err); }
 let hintTimer = null;
-function statusHint(msg) { status(msg); clearTimeout(hintTimer); hintTimer = setTimeout(() => { if (!cur || !cur.sim) status('Ready'); }, 8000); }
+// a hint clears itself after 8 s, unless something else has written the status bar since
+function statusHint(msg) { status(msg); clearTimeout(hintTimer); hintTimer = setTimeout(() => { if ($('stMsg').textContent === msg && (!cur || !cur.sim)) status('Ready'); }, 8000); }
 
 /* ---------- designs ---------- */
 const files = []; let cur = null, seq = 1, designNo = 1;
@@ -348,18 +349,22 @@ function finishShape(st) {
 function placeAt(st, x, y) {
   const pl = st.placing; if (!pl) return;
   commit(st);
+  let hint = '';
   if (pl.clip) {
     const r = pasteClip(st.doc, pl.clip, snap(x) - pl.anchor[0], snap(y) - pl.anchor[1]);
     st.sel = { parts: new Set(r.parts.map((p) => p.id)), wires: new Set(r.wires) };
   } else {
     const p = addPart(st.doc, pl.type, x, y); p.rot = pl.rot || 0; p.mirror = !!pl.mirror; p.params = { ...p.params, ...pl.params }; if (pl.cat) p.cat = { ...pl.cat };
     if (pl.type === 'arduino' && !st.doc.sketch) st.doc.sketch = BLINK;
-    if (LIBRARY[pl.type].inline && !insertInline(st.doc, p)) statusHint('The current probe isn’t on a wire: wire its two ends, or place it on a wire.');
+    if (LIBRARY[pl.type].inline && !insertInline(st.doc, p)) hint = 'The current probe isn’t on a wire: wire its two ends, or place it on a wire.';
+    else if (LIBRARY[pl.type].mprobe && !LIBRARY[pl.type].inline && !snapProbe(st.doc, p)) hint = `${p.ref} isn’t on a wire or pin, so it reads nothing: move its tip onto one.`;
     st.sel = { parts: new Set([p.id]), wires: new Set() };
   }
   st.placing = null; status('Ready');
   afterEdit(st);
-  if (pl.repeat) { startPlacing(pl.type, null, { repeat: true }); return; }   // probes keep placing until Esc, as in Multisim
+  if (pl.repeat) startPlacing(pl.type, null, { repeat: true });   // probes keep placing until Esc, as in Multisim
+  if (hint) statusHint(hint);   // last, so the placing prompt doesn't cover it
+  if (pl.repeat) return;
   if (pl.type === 'text' || pl.type === 'comment') { const p = st.doc.parts[st.doc.parts.length - 1]; if (p && p.type === pl.type) openProps(st, p); }
   if (pl.reopen) openComponentBrowser(ctx, pl.reopen);   // as in Multisim, the dialog comes back for the next part
 }
@@ -1150,7 +1155,7 @@ function applyLayout() {
 function erc(st) {
   const res = [];
   if (!hasGround(st)) res.push({ type: 'Error', text: 'The circuit has no ground reference.' });
-  for (const c of st.circuit.comps) for (const [p, n] of Object.entries(c.pins)) if ((n === '?' || !n) && !/^X(SC|BP|FG)/i.test(c.ref) && !['xsc', 'xsc4', 'xscat', 'xtek', 'xbp', 'xfg', 'xwm', 'xfc', 'xcp', 'xiv', 'xda', 'xsa', 'agfg', 'agdmm', 'arduino', 'hbridge'].includes(c.lib)) res.push({ type: 'Warning', text: `Pin ${p} is not connected.`, where: c.ref });
+  for (const c of st.circuit.comps) for (const [p, n] of Object.entries(c.pins)) if ((n === '?' || !n) && !/^X(SC|BP|FG)/i.test(c.ref) && !['xsc', 'xsc4', 'xscat', 'xtek', 'xbp', 'xfg', 'xwm', 'xfc', 'xcp', 'xiv', 'xda', 'xsa', 'agfg', 'agdmm', 'arduino', 'hbridge'].includes(c.lib)) res.push({ type: 'Warning', text: LIBRARY[c.lib] && LIBRARY[c.lib].mprobe ? `Probe ${c.ref} isn’t on a wire or pin; V(${c.ref}) has no node until its tip touches one.` : `Pin ${p} is not connected.`, where: c.ref });
   const cnt = new Map(); for (const c of st.circuit.comps) for (const n of Object.values(c.pins)) cnt.set(n, (cnt.get(n) || 0) + 1);
   for (const [n, k] of cnt) if (k === 1 && n !== '?' && n !== '0' && !/^nc_/i.test(n)) res.push({ type: 'Warning', text: `Net ${n} connects to only one pin.`, where: n });
   st.results = res.length ? res : [{ type: 'Info', text: 'ERC found no errors.' }];
@@ -1199,8 +1204,10 @@ function samplesWin() {
   WM.open({ id, title: 'Open Samples - ME230 circuits', modal: true, body: h('div', { class: 'startcard' },
     h('p', { class: 'note', text: 'Quiz 2 review circuits, with the correct analysis and output variables already selected.' }),
     buttons((l) => l.id.startsWith('q2-'), /^Quiz 2: /),
+    h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'HW3 (Laplace transform, transfer functions, Fourier series): each circuit notes the hand solution to compare with. Press F5.' }),
+    buttons((l) => l.id.startsWith('hw3-'), /^HW3: /),
     h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'Starter circuits for the ME230 labs. Open one and press Run (F5); double-click an instrument to see its panel.' }),
-    buttons((l) => !l.id.startsWith('q2-') && !l.id.startsWith('ino-')),
+    buttons((l) => !/^(q2|hw3|ino)-/.test(l.id)),
     h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'The course’s Arduino sketches (BareMinimum), each on a circuit to run it. MCU » Arduino sketch shows the code and the Serial Monitor.' }),
     buttons((l) => l.id.startsWith('ino-'), /^Arduino: /),
     h('div', { class: 'dlgbtns' }, h('button', { class: 'btn', text: 'Close', onclick: () => WM.close(id) }))) });

@@ -122,3 +122,60 @@ test('Lab 6: the sketch drives the motor; flipping the switch reverses it and sw
   const led = (ref) => { const k = c.comps.find((x) => x.ref === ref); return cs.last(k.pins.A.toLowerCase()) - cs.last(k.pins.K.toLowerCase()); };
   assert.ok(led('LED1') > 1.6 && led('LED2') < 1, `forward LED on (${led('LED1')}), reverse LED off (${led('LED2')})`);
 });
+
+// HW3 samples against their hand (Laplace / Fourier) solutions
+const hw3 = async (id) => { const { d, c } = lab(id), A = withDefaults(d.analyses); return { pages: await runAnalysis({ exec: analysisExec, circuit: c, name: d.name, switches: {}, A, id: A.active }), c }; };
+const yAt = (tr, t) => { const i = tr.x.findIndex((x) => x >= t); return i <= 0 ? tr.y[Math.max(0, i)] : tr.y[i - 1] + (tr.y[i] - tr.y[i - 1]) * (t - tr.x[i - 1]) / (tr.x[i] - tr.x[i - 1]); };
+
+test('HW3 samples are wired and open with their analyses', () => {
+  const expected = { 'hw3-fourier': 'fourier', 'hw3-rl-switch': 'tran', 'hw3-bandpass': 'ac', 'hw3-step': 'tran', 'hw3-abm': 'tran', 'hw3-exp': 'tran' };
+  for (const [id, active] of Object.entries(expected)) {
+    const { d, c } = lab(id);
+    assert.equal(d.analyses.active, active, id);
+    assert.deepEqual(c.comps.filter((x) => x.template && Object.values(x.pins).includes('?')).map((x) => x.ref), [], `${id} has unconnected pins`);
+  }
+});
+
+test('HW3 problem 1: the sawtooth has odd harmonics 40/(n²π²) cos + 20/(nπ) sin', async () => {
+  const { pages: [p] } = await hw3('hw3-fourier'), mag = (n) => +p.table.rows[n - 1][2];
+  const want = (n) => Math.hypot(40 / (n * n * Math.PI ** 2), 20 / (n * Math.PI));
+  near(mag(1), want(1), 0.03, '|H1|'); near(mag(3), want(3), 0.03, '|H3|'); near(mag(5), want(5), 0.03, '|H5|');
+  // the 20 V jump falls between the analysis's 0.01 s samples, leaving even harmonics under 1% of the fundamental
+  assert.ok(mag(2) < 0.01 * mag(1) && mag(4) < 0.01 * mag(1), `even harmonics vanish: ${mag(2)}, ${mag(4)}`);
+});
+
+test('HW3 problem 2: i1 = 15 − 14e^−2t − e^−12t and i2 = 7 − 8.4e^−2t + 1.4e^−12t after the switch closes', async () => {
+  const { pages: [p] } = await hw3('hw3-rl-switch'), [i1, i2] = p.graphs[0].traces.map((tr) => ({ ...tr, y: tr.y.map(Math.abs) }));
+  for (const t of [0, 0.05, 0.2, 0.5, 1, 3]) {
+    near(yAt(i1, t), 15 - 14 * Math.exp(-2 * t) - Math.exp(-12 * t), 0.02, `i1(${t})`);
+    near(yAt(i2, t), 7 - 8.4 * Math.exp(-2 * t) + 1.4 * Math.exp(-12 * t), 0.02, `i2(${t})`);
+  }
+});
+
+test('HW3 problem 4: the band-pass peaks at 30.63 Hz with |H| = 1', async () => {
+  const { pages: [p] } = await hw3('hw3-bandpass'), tr = p.graphs[0].traces[0], k = tr.y.indexOf(Math.max(...tr.y));
+  near(tr.x[k], 1 / (2 * Math.PI * Math.sqrt(2.7 * 10e-6)), 0.4, 'f0'); near(tr.y[k], 1, 0.01, '|H(f0)|')   // 200 points/decade land within 0.4% of a Q = 17 peak;
+});
+
+test('HW3 problem 10: v(t) = 1.5 − 1.572e^−4t + 0.072e^−12t', async () => {
+  const { pages: [p] } = await hw3('hw3-step'), tr = p.graphs[0].traces[0];
+  for (const t of [0.05, 0.1, 0.25, 0.5, 1, 2]) near(yAt(tr, t), 1.5 - 1.5723 * Math.exp(-4 * t) + 0.0723 * Math.exp(-12 * t), 3e-3, `v(${t})`);
+});
+
+test('HW3 problem 11: an ABM source 36t e^−6t mA gives i(t) = 36t² e^−6t mA in R2', async () => {
+  const { pages: [p] } = await hw3('hw3-abm'), tr = p.graphs[0].traces[0];
+  for (const t of [0.1, 1 / 3, 0.5, 1, 2]) near(Math.abs(yAt(tr, t)), 0.036 * t * t * Math.exp(-6 * t), 2e-6, `i(${t})`);
+});
+
+test('HW3 problem 12: an exponential source 6e^−2t A matches a direct integration of the circuit', async () => {
+  const { pages: [p] } = await hw3('hw3-exp'), tr = p.graphs[0].traces[0];
+  // states: capacitor voltage vc (left - right) and iL; node A = is || R1, node B = R2 || L
+  const C = 0.10759, L = 0.6196, f = (t, [vc, iL]) => { const is = 6 * Math.exp(-2 * t), vA = (is + vc / 5 - iL) / 0.3, vB = vA - vc; return [(vB / 5 + iL) / C, vB / L]; };
+  let s = [0, 0], t = 0; const h = 1e-4, want = new Map();
+  while (t < 5 - h / 2) {
+    const k1 = f(t, s), k2 = f(t + h / 2, s.map((x, i) => x + h / 2 * k1[i])), k3 = f(t + h / 2, s.map((x, i) => x + h / 2 * k2[i])), k4 = f(t + h, s.map((x, i) => x + h * k3[i]));
+    s = s.map((x, i) => x + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])); t += h;
+    for (const q of [0.1, 0.5, 1, 2, 4]) if (Math.abs(t - q) < h / 2) want.set(q, s[1]);
+  }
+  for (const [q, iL] of want) near(Math.abs(yAt(tr, q)), Math.abs(iL), 5e-3, `iL(${q})`);
+});

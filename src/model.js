@@ -405,6 +405,23 @@ export function insertInline(doc, part) {
   doc.wires.splice(hit.wi, 1, ...parts);
   return true;
 }
+// a voltage probe dropped beside a wire or pin moves its tip onto the nearest one within reach (a grid square and a
+// half), so it can't silently float and give V(PR1) no node; false when nothing is in reach
+export function snapProbe(doc, part, reach = 1.5 * GRID) {
+  const tips = partPins(part); if (tips.length !== 1) return true;
+  const q = tips[0], cand = [];
+  for (const o of doc.parts) if (o !== part) for (const r of partPins(o)) cand.push([r.x, r.y]);
+  for (const w of doc.wires) for (let s = 1; s < w.pts.length; s++) {
+    const [a, b] = [w.pts[s - 1], w.pts[s]], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    const t = L2 ? Math.max(0, Math.min(1, ((q.x - a[0]) * dx + (q.y - a[1]) * dy) / L2)) : 0, p = [a[0] + t * dx, a[1] + t * dy], g = [snap(p[0]), snap(p[1])];
+    cand.push(onSegment(g, a, b) ? g : p);   // a grid point on the wire when there is one
+  }
+  let best = null, bd = reach + 1e-9;
+  for (const c of cand) { const d = Math.hypot(c[0] - q.x, c[1] - q.y); if (d < bd) { bd = d; best = c; } }
+  if (!best) return false;
+  part.x += best[0] - q.x; part.y += best[1] - q.y;
+  return true;
+}
 // replace a library part by another kind in the same place; wires on pins with the same name follow the new pins
 export function replacePart(doc, part, type, params, cat) {
   const before = partPins(part), def = LIBRARY[type];

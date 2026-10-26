@@ -4084,6 +4084,9 @@ const syDiodeBody = (bar) => [sG([[-6, -6], [-6, 6], [6, 0]], 'ink', 'solid'), .
 
 // vertical sources between (0,-y) and (0,y): a circle of radius r with leads
 const sySrcCircle = (y, r) => [sL([0, -y], [0, -r]), sL([0, r], [0, y]), sC(0, 0, r)];
+const syISrc = () => [...sySrcCircle(27, 18), sL([-5, 11], [-5, -8]), syArrowHead(-5, -12, 0, -1, 5)];
+// a rise then an exponential decay
+const syExp = () => { const p = [[-11, 7], [-7, 7], [-7, -7]]; for (let i = 1; i <= 8; i++) p.push([+(-7 + i * 2.25).toFixed(2), +(7 - 14 * Math.exp(-i / 2.2)).toFixed(2)]); return { k: 'l', p }; };
 
 const SYMBOLS = {
   resistor: () => [...syTwoLead(-13.5, 13.5), syZigzag(-13.5, 13.5)],
@@ -4108,6 +4111,14 @@ const SYMBOLS = {
   clocksrc: () => [...sySrcCircle(27, 18), sL([-9, 5], [-9, -5], [0, -5], [0, 5], [9, 5], [9, -5]), sT(-14, -27, '+', { size: 9 })],
   pulsesrc: () => [...sySrcCircle(27, 18), sL([-10, 6], [-5, 6], [-5, -6], [3, -6], [3, 6], [10, 6]), sT(-14, -27, '+', { size: 9 })],
   stepsrc: () => [...sySrcCircle(27, 18), sL([-10, 6], [-1, 6], [-1, -6], [10, -6]), sT(-14, -27, '+', { size: 9 })],
+  pwlsrc: () => [...sySrcCircle(27, 18), sL([-11, 6], [-5, -6], [1, 2], [5, -3], [11, 6]), sT(-14, -27, '+', { size: 9 })],
+  expsrc: () => [...sySrcCircle(27, 18), syExp(), sT(-14, -27, '+', { size: 9 })],
+  abmsrc: () => [sL([0, -27], [0, -18]), sL([0, 18], [0, 27]), sG([[0, -18], [18, 0], [0, 18], [-18, 0]], null), sT(0, -12, '+', { size: 11, bold: true }), sT(0, 3, '−', { size: 11, bold: true })],
+  // current versions: the arrow (current leaves at pin 1) beside a small waveform
+  pulseisrc: () => [...syISrc(), sL([2, 5], [5, 5], [5, -5], [10, -5], [10, 5], [13, 5])],
+  pwlisrc: () => [...syISrc(), sL([2, 5], [6, -5], [9, 1], [13, -4])],
+  expisrc: () => [...syISrc(), { k: 'l', p: syExp().p.map(([x, y]) => [+(7.5 + x * 0.5).toFixed(2), +(y * 0.8).toFixed(2)]) }],
+  abmisrc: () => [sL([0, -27], [0, -18]), sL([0, 18], [0, 27]), sG([[0, -18], [18, 0], [0, 18], [-18, 0]], null), sL([0, 10], [0, -7]), syArrowHead(0, -11, 0, -1, 5)],
   dcinteractive: () => [...sySrcCircle(27, 18), sT(0, -14, '+', { size: 11, bold: true }), sT(0, 3, '−', { size: 11, bold: true }), sL([-15, 15], [14, -14]), syArrowHead(15, -15, 1, -1, 5)],
   isrc: () => [...sySrcCircle(18, 12), sL([0, 7], [0, -5]), syArrowHead(0, -8, 0, -1, 4)],
   acisrc: () => [...sySrcCircle(27, 18), sL([0, 12], [0, -9]), syArrowHead(0, -13, 0, -1, 5), sySine(-1, 3, 10, 3)],
@@ -4123,6 +4134,9 @@ const SYMBOLS = {
     [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, 0, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, 0], [18, 0]), { ...sL([-11.5, -1], [12, -2]), cls: 'lever' }]],
   spdt: () => { const base = [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, -9, 2.2, '#fff'), sC(13.5, 9, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, -9], [18, -9]), sL([15.7, 9], [18, 9])];
     return [[...base, { ...sL([-11.5, -0.5], [11.5, -8]), cls: 'lever' }], [...base, { ...sL([-11.5, 0.5], [11.5, 8]), cls: 'lever' }]]; },
+  // time-delay switch: an SPST with a clock over the lever
+  tdsw: () => [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, 0, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, 0], [18, 0]), { ...sL([-11.5, -1], [12, -7]), cls: 'lever' },
+    sC(0, -9, 4, '#fff'), sL([0, -12], [0, -9], [2.5, -9])],
   pushbutton: (nc) => { const base = [sC(-13.5, 0, 2.2, '#fff'), sC(13.5, 0, 2.2, '#fff'), sL([-18, 0], [-15.7, 0]), sL([15.7, 0], [18, 0])];
     const bar = (y) => [{ ...sL([-13.5, y], [13.5, y]), cls: 'lever' }, sL([0, y], [0, y - 8]), sL([-4, y - 8], [4, y - 8])];
     return nc ? [[...base, ...bar(2.5)], [...base, ...bar(-6)]] : [[...base, ...bar(-6)], [...base, ...bar(2.5)]]; },
@@ -4728,6 +4742,39 @@ const meterDef = (vm, horiz) => ({ label: `${vm ? 'Voltmeter' : 'Ammeter'} (${ho
   params: [{ key: 'R', label: vm ? 'Resistance (R)' : 'Resistance (R)', unit: 'Ω', def: vm ? '10Meg' : '1n' }, { key: 'mode', label: 'Mode', options: ['DC', 'AC'], def: 'DC' }, { key: 'rev', label: 'Reversed polarity', options: ['no', 'yes'], def: 'no' }],
   spice: (p) => ({ template: `x%p ${p.rev === 'yes' ? '%t2 %t1' : '%t1 %t2'} ${vm ? 'Voltmeter' : 'Ammeter'}%p\n.subckt ${vm ? 'Voltmeter' : 'Ammeter'}%p 1 2\n${vm ? `R1 1 2 ${p.R}` : `Vam 1 3 dc 0\nR1 3 2 ${p.R}`}\n.ends`, params: [] }),
   value: () => '', meter: vm ? 'volt' : 'amp' });
+// Piecewise linear, exponential and ABM sources, voltage (V) or current (I): current leaves at pin 1, as for every source
+const srcHead = (K) => (K === 'V' ? 'v%p %t1 %t2' : 'i%p %t2 %t1');
+// "0 0, 1m 5, 2m -5" (time value pairs; commas, spaces or new lines) -> [[0, 0], [1e-3, 5], [2e-3, -5]], times kept increasing
+function pwlPoints(text) {
+  const n = String(text ?? '').trim().split(/[\s,;]+/).filter(Boolean).map((x) => num0(x.replace('µ', 'u'), NaN)), out = [];
+  for (let i = 0; i + 1 < n.length; i += 2) {
+    if (!isFinite(n[i]) || !isFinite(n[i + 1]) || (out.length && n[i] < out[out.length - 1][0])) continue;
+    out.push([out.length && n[i] === out[out.length - 1][0] ? n[i] + 1e-9 : n[i], n[i + 1]]);   // a repeated time is a step: 1 ns
+  }
+  return out.length ? out : [[0, 0]];
+}
+const pwfmt = (x) => String(+(+x).toPrecision(12));   // pwl times at full precision (pfmt would merge 2 and 2.000001)
+const pwlSrc = (K) => ({ label: `Piecewise linear ${K === 'V' ? 'voltage' : 'current'}`, prefix: K, family: `SIGNAL_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}_SOURCES`, part: `PIECEWISE_LINEAR_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}`,
+  pins: SRC2, box: box(-2, -2, 2, 2), sym: K === 'V' ? 'pwlsrc' : 'pwlisrc',
+  params: [{ key: 'pts', label: `Points (time ${K === 'V' ? 'V' : 'A'}, ...)`, def: '0 0, 1m 1, 2m -1, 3m 0' }, { key: 'rep', label: 'Repeat data', options: ['no', 'yes'], def: 'no' }],
+  spice: (p) => { const P = pwlPoints(p.pts); return { template: `${srcHead(K)} dc ${pfmt(P[0][1])} ac 1 pwl(${P.map(([t, y]) => `${pwfmt(t)} ${pfmt(y)}`).join(' ')})${p.rep === 'yes' && P.length > 1 ? ' r=0' : ''}`, params: [] }; },
+  value: (p) => `PWL${p.rep === 'yes' ? ' (repeat)' : ''}` });
+// SPICE EXP: V1 until TD1, then towards V2 with TAU1; from TD2 back towards V1 with TAU2. 6e^-2t u(t): V1 = 6, V2 = 0, TAU1 = 0.5
+// (ngspice holds V1 for one TSTEP when TD1 = 0, which skews a u(t) problem by ~1%; 1 ps starts the change at t = 0)
+const expSrc = (K) => { const u = K === 'V' ? 'V' : 'A';
+  return { label: `Exponential ${K === 'V' ? 'voltage' : 'current'}`, prefix: K, family: `SIGNAL_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}_SOURCES`, part: `EXPONENTIAL_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}`,
+    pins: SRC2, box: box(-2, -2, 2, 2), sym: K === 'V' ? 'expsrc' : 'expisrc',
+    params: [{ key: 'V1', label: 'Initial value', unit: u, def: '0' }, { key: 'V2', label: 'Pulsed value', unit: u, def: '1' }, { key: 'td1', label: 'Rise delay time', unit: 's', def: '0' },
+      { key: 'tau1', label: 'Rise time constant', unit: 's', def: '1m' }, { key: 'td2', label: 'Fall delay time', unit: 's', def: '1e9' }, { key: 'tau2', label: 'Fall time constant', unit: 's', def: '1m' }],
+    spice: (p) => ({ template: `${srcHead(K)} dc ${pfmt(num0(p.V1, 0))} ac 1 exp(${[p.V1, p.V2, p.td1, p.tau1, p.td2, p.tau2].map((x, i) => pfmt(i === 2 ? num0(x, 0) || 1e-12 : num0(x, [0, 1, 0, 1e-3, 1e9, 1e-3][i]))).join(' ')})`, params: [] }),
+    value: (p) => `${p.V1} ${u} -> ${p.V2} ${u}\nτ = ${p.tau1}s` }; };
+// ABM (analog behavioural) source: any expression of TIME, node voltages V(N1) and source currents I(V1), as ngspice's B source
+const abmSrc = (K) => ({ label: `ABM ${K === 'V' ? 'voltage' : 'current'} source`, prefix: K, family: `CONTROLLED_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}_SOURCES`, part: `ABM_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}`,
+  pins: SRC2, box: box(-2, -2, 2, 2), sym: K === 'V' ? 'abmsrc' : 'abmisrc',
+  params: [{ key: 'expr', label: `${K === 'V' ? 'Voltage' : 'Current'} expression`, def: K === 'V' ? '5*exp(-TIME/1m)' : '36m*TIME*exp(-6*TIME)' }],
+  // spaces out: the netlist writer reads " + " as a continuation line; engineering suffixes as numbers ngspice's B source parses
+  spice: (p) => ({ template: `b${K === 'V' ? '%p %t1 %t2 v' : '%p %t2 %t1 i'}=${String(p.expr || '0').replace(/\s+/g, '').replace(/(\d(?:\.\d*)?)(meg|[munpkgf])(?![a-z(])/gi, (_, d, s) => `${d}${({ meg: 'e6', m: 'e-3', u: 'e-6', n: 'e-9', p: 'e-12', k: 'e3', g: 'e9', f: 'e-15' })[s.toLowerCase()]}`)}`, params: [] }),
+  value: (p) => `${K}=${p.expr}` });
 // measurement probes (Place » Probe): colour names as in Multisim's probe properties
 const PROBE_COLORS = { Yellow: '#f0c800', Red: '#ff3030', Green: '#28b828', Blue: '#3a78ff', Magenta: '#d040d0', Cyan: '#20b8c8', Orange: '#ff8c1a' };
 const probeCol = (p) => PROBE_COLORS[p.color] || PROBE_COLORS.Yellow;
@@ -4815,6 +4862,7 @@ const LIBRARY = {
     spice: (p) => { const V0 = num0(p.V0, 0), V1 = num0(p.V1, 5), ts = num0(p.ts, 0), tr = Math.max(1e-12, num0(p.tr, 1e-8));
       return { template: `v%p %t1 %t2 dc ${pfmt(V0)} pwl(0 ${pfmt(V0)} ${pfmt(ts)} ${pfmt(V0)} ${pfmt(ts + tr)} ${pfmt(V1)} ${pfmt(ts + tr + 1)} ${pfmt(V1)})`, params: ['0', p.V1] }; },
     value: (p) => `${p.V0} V -> ${p.V1} V\n${p.ts}s` },
+  pwlvoltage: pwlSrc('V'), expvoltage: expSrc('V'),
   dcinteractive: { label: 'DC interactive voltage', prefix: 'V', family: 'SIGNAL_VOLTAGE_SOURCES', part: 'DC_INTERACTIVE_VOLTAGE', pins: SRC2, box: box(-2, -2, 2, 2), sym: 'dcinteractive',
     params: [{ key: 'Vmax', label: 'Maximum value', unit: 'V', def: '10' }, { key: 'Vmin', label: 'Minimum value', unit: 'V', def: '0' }, { key: 'key', label: 'Key', options: [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'], def: 'A' },
       { key: 'inc', label: 'Increment', unit: '%', def: '5' }, { key: 'setting', label: 'Setting', unit: '%', def: '50' }], interactive: 'vdc',
@@ -4836,6 +4884,12 @@ const LIBRARY = {
     params: [{ key: 'A', label: 'Current (Pk)', unit: 'A', def: '1' }, { key: 'off', label: 'Current offset', unit: 'A', def: '0' }, { key: 'f', label: 'Frequency (F)', unit: 'Hz', def: '1k' }, { key: 'ph', label: 'Phase', unit: '°', def: '0' }],
     spice: (p) => ({ template: `i%p %t2 %t1 dc ${pfmt(num0(p.off, 0))} ac ${pfmt(num0(p.A, 1))} ${pfmt(num0(p.ph, 0))} sin(${pfmt(num0(p.off, 0))} ${pfmt(num0(p.A, 1))} ${pfmt(num0(p.f, 1e3))} 0 0 ${pfmt(num0(p.ph, 0))})`, params: ['0', p.A] }),
     value: (p) => `${p.A}Apk\n${p.f}Hz\n${p.ph}°` },
+  pulsecurrent: { label: 'Pulse current', prefix: 'I', family: 'SIGNAL_CURRENT_SOURCES', part: 'PULSE_CURRENT', pins: SRC2, box: box(-2, -2, 2, 2), sym: 'pulseisrc',
+    params: [{ key: 'V1', label: 'Initial value', unit: 'A', def: '0' }, { key: 'V2', label: 'Pulsed value', unit: 'A', def: '1' }, { key: 'td', label: 'Delay time', unit: 's', def: '0' },
+      { key: 'tr', label: 'Rise time', unit: 's', def: '1n' }, { key: 'tf', label: 'Fall time', unit: 's', def: '1n' }, { key: 'pw', label: 'Pulse width', unit: 's', def: '500u' }, { key: 'per', label: 'Period', unit: 's', def: '1m' }],
+    spice: (p) => ({ template: `i%p %t2 %t1 dc ${pfmt(num0(p.V1, 0))} ac 1 pulse(${[p.V1, p.V2, p.td, p.tr, p.tf, p.pw, p.per].map((x, i) => pfmt(num0(x, [0, 1, 0, 1e-9, 1e-9, 5e-4, 1e-3][i]))).join(' ')})`, params: ['0', p.V2] }),
+    value: (p) => `${p.V1} A ${p.V2} A\n${p.pw}s ${p.per}s` },
+  pwlcurrent: pwlSrc('I'), expcurrent: expSrc('I'),
   dciinteractive: { label: 'DC interactive current', prefix: 'I', family: 'SIGNAL_CURRENT_SOURCES', part: 'DC_INTERACTIVE_CURRENT', pins: SRC2, box: box(-2, -2, 2, 2), sym: 'dciinteractive',
     params: [{ key: 'Vmax', label: 'Maximum value', unit: 'A', def: '1' }, { key: 'Vmin', label: 'Minimum value', unit: 'A', def: '0' }, { key: 'key', label: 'Key', options: [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'], def: 'A' },
       { key: 'inc', label: 'Increment', unit: '%', def: '5' }, { key: 'setting', label: 'Setting', unit: '%', def: '50' }], interactive: 'idc',
@@ -4850,6 +4904,7 @@ const LIBRARY = {
     params: [{ key: 'k', label: 'Transresistance (H)', unit: 'Ω', def: '1' }], spice: (p) => ({ template: `x%p %t1 %t2 %t3 %t4 CCVS%p\n.subckt CCVS%p 1 2 3 4\nVs 3 4 dc 0\nH1 1 2 Vs ${p.k}\n.ends`, params: [] }), value: (p) => `${p.k} Ω` },
   cccs: { label: 'Current-controlled current source', prefix: 'I', family: 'CONTROLLED_CURRENT_SOURCES', part: 'CURRENT_CONTROLLED_CURRENT_SOURCE', pins: [P('1', 1, -3), P('2', 1, 3), P('3', -2, -3), P('4', -2, 3)], box: box(-1, -2, 3, 2), sym: 'cccs',
     params: [{ key: 'k', label: 'Current gain (F)', unit: 'A/A', def: '1' }], spice: (p) => ({ template: `x%p %t1 %t2 %t3 %t4 CCCS%p\n.subckt CCCS%p 1 2 3 4\nVs 3 4 dc 0\nF1 2 1 Vs ${p.k}\n.ends`, params: [] }), value: (p) => `${p.k} A/A` },
+  abmvoltage: abmSrc('V'), abmcurrent: abmSrc('I'),
   ground: { label: 'Ground', prefix: 'GND', family: 'POWER_SOURCES', part: 'GROUND', pins: [P('1', 0, 0)], box: box(-1, 0, 1, 1.6), sym: 'ground', params: [], spice: () => ({ template: '', params: [] }) },
   dgnd: { label: 'Digital ground', prefix: 'GND', family: 'POWER_SOURCES', part: 'DGND', pins: [P('1', 0, 0)], box: box(-1, 0, 1, 1.9), sym: 'dgnd', params: [], spice: () => ({ template: '', params: [] }) },
   rail: { label: 'Supply rail (VCC/VEE)', prefix: 'VR', family: 'POWER_SOURCES', part: 'VCC', pins: [P('1', 0, 0)], box: box(-1, -1.6, 1, 0), sym: (p) => SYMBOLS[/^(VEE|VSS)$/i.test(p.name) ? 'railneg' : 'rail'](),
@@ -4903,6 +4958,14 @@ const LIBRARY = {
     spice: () => ({ template: 'x%p %t1 %t2 Switch%p\n.subckt Switch%p 1 2\nV2 5 0 DC 0\nR1 5 6 20\nV1 6 0 DC 0\nW0 1 2 V1 SWNO\n.model SWNO csw(it=0.0375 ih=0.0125 ron=1m roff=1e12)\n.ends', params: [] }), value: keyLabel }),
   spdt: sw({ label: 'Switch (SPDT)', part: 'SPDT', pins: [P('COM', -2, 0), P('A', 2, -1), P('B', 2, 1)], box: box(-1.4, -1.4, 1.4, 1.4),
     spice: () => ({ template: 'x%p %tCOM %tA %tB Switch%p\n.subckt Switch%p 1 2 3\nV2 5 0 DC 0\nR1 5 6 20\nV1 6 0 DC 0\nW0 1 2 V1 NC_contact\nW1 1 3 V1 NO_contact\n.model NC_contact csw(it=0.0375 ih=0.0125 ron=1e12 roff=1m)\n.model NO_contact csw(it=0.0375 ih=0.0125 ron=1m roff=1e12)\n.ends', params: [] }), value: keyLabel }),
+  // TD_SW1: closed from TON to TOFF (TON < TOFF), or closed until TOFF and again from TON (TOFF < TON); a switch at
+  // TON = 0 is still open at the operating point, so i(0-) = 0 as in a "switch closes at t = 0" problem
+  tdsw: { label: 'Time-delay switch', prefix: 'J', family: 'SWITCH', part: 'TD_SW1', pins: [P('1', -2, 0), P('2', 2, 0)], box: box(-1.4, -1.4, 1.4, 0.4), sym: 'tdsw',
+    params: [{ key: 'ton', label: 'Time on (TON)', unit: 's', def: '0.5' }, { key: 'toff', label: 'Time off (TOFF)', unit: 's', def: '1e9' }],
+    spice: (p) => { const on = Math.max(0, num0(p.ton, 0.5)), off = Math.max(0, num0(p.toff, 1e9)), e = 1e-9, a = Math.min(on, off), b = Math.max(on, off), s0 = on < off ? 0 : 1;
+      const pts = [[0, s0], [a, s0], [a + e, 1 - s0], ...(b > a ? [[b, 1 - s0], [b + e, s0]] : [])];
+      return { template: `x%p %t1 %t2 TDSwitch%p\n.subckt TDSwitch%p 1 2\nVc 3 0 pwl(${pts.map(([t, y]) => `${pfmt(t)} ${y}`).join(' ')})\nS1 1 2 3 0 TDSW\n.model TDSW sw(vt=0.5 vh=0.1 ron=1m roff=1e12)\n.ends`, params: [] }; },
+    value: (p) => `TON = ${p.ton}s${num0(p.toff, 1e9) < 1e9 ? `\nTOFF = ${p.toff}s` : ''}` },
   pushbutton: sw({ label: 'Push button', part: 'PB_NO', pins: [P('1', -2, 0), P('2', 2, 0)], box: box(-1.4, -1.6, 1.4, 0.4), sym: (p) => SYMBOLS.pushbutton(p.nc === 'yes'), layers: true, momentary: true,
     params: [{ key: 'key', label: 'Key for toggle', options: ['Space', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...'0123456789'], def: 'Space' }, { key: 'nc', label: 'Normally closed', options: ['no', 'yes'], def: 'no' }],
     spice: (p) => ({ template: `x%p %t1 %t2 Switch%p\n.subckt Switch%p 1 2\nV2 5 0 DC 0\nR1 5 6 20\nV1 6 0 DC 0\nW0 1 2 V1 ${p.nc === 'yes' ? 'SWNC' : 'SWNO'}\n.model ${p.nc === 'yes' ? 'SWNC csw(it=0.0375 ih=0.0125 ron=1e12 roff=1m)' : 'SWNO csw(it=0.0375 ih=0.0125 ron=1m roff=1e12)'}\n.ends`, params: [] }), value: keyLabel }),
@@ -5075,17 +5138,24 @@ const CATALOG = [
       cmp('AC_VOLTAGE', 'acvoltage', {}, 'AC voltage source (peak voltage, frequency, phase)'),
       cmp('CLOCK_VOLTAGE', 'clock', {}, 'Clock (square wave) voltage source'),
       cmp('DC_INTERACTIVE_VOLTAGE', 'dcinteractive', {}, 'DC voltage you change with a key while the simulation runs'),
+      cmp('EXPONENTIAL_VOLTAGE', 'expvoltage', {}, 'Exponential voltage (SPICE EXP: initial and pulsed value, delays, time constants)'),
+      cmp('PIECEWISE_LINEAR_VOLTAGE', 'pwlvoltage', {}, 'Piecewise linear voltage: straight lines between (time, voltage) points, optionally repeated'),
       cmp('PULSE_VOLTAGE', 'pulse', {}, 'Pulse voltage source (initial/pulsed value, delay, rise, fall, width, period)'),
       cmp('STEP_VOLTAGE', 'step', {}, 'Step voltage source'),
       cmp('SQUARE_TRIANGLE_SINE_VOLTAGE', 'funcgen', {}, 'Sine, square or triangle voltage (as used by the lab starters)') ] },
     { family: 'SIGNAL_CURRENT_SOURCES', comps: [
       cmp('AC_CURRENT', 'accurrent', {}, 'AC current source (peak current, frequency, phase)'),
       cmp('DC_CURRENT', 'dccurrent', {}, 'DC current source; current leaves at the arrow'),
-      cmp('DC_INTERACTIVE_CURRENT', 'dciinteractive', {}, 'DC current you change with a key while the simulation runs') ] },
+      cmp('DC_INTERACTIVE_CURRENT', 'dciinteractive', {}, 'DC current you change with a key while the simulation runs'),
+      cmp('EXPONENTIAL_CURRENT', 'expcurrent', {}, 'Exponential current (SPICE EXP); 6e^-2t u(t) A is initial 6, pulsed 0, rise time constant 0.5'),
+      cmp('PIECEWISE_LINEAR_CURRENT', 'pwlcurrent', {}, 'Piecewise linear current between (time, current) points'),
+      cmp('PULSE_CURRENT', 'pulsecurrent', {}, 'Pulse current source (initial/pulsed value, delay, rise, fall, width, period)') ] },
     { family: 'CONTROLLED_VOLTAGE_SOURCES', comps: [
+      cmp('ABM_VOLTAGE', 'abmvoltage', {}, 'Voltage from any expression of TIME, node voltages V(N1) and currents I(V1)'),
       cmp('CURRENT_CONTROLLED_VOLTAGE_SOURCE', 'ccvs', {}, 'Output voltage = H x control current'),
       cmp('VOLTAGE_CONTROLLED_VOLTAGE_SOURCE', 'vcvs', {}, 'Output voltage = E x control voltage') ] },
     { family: 'CONTROLLED_CURRENT_SOURCES', comps: [
+      cmp('ABM_CURRENT', 'abmcurrent', {}, 'Current from any expression, e.g. 36m*TIME*exp(-6*TIME) for 36t e^-6t mA'),
       cmp('CURRENT_CONTROLLED_CURRENT_SOURCE', 'cccs', {}, 'Output current = F x control current'),
       cmp('VOLTAGE_CONTROLLED_CURRENT_SOURCE', 'vccs', {}, 'Output current = G x control voltage') ] } ] },
   { group: 'Basic', icon: 'cbasic', families: [
@@ -5104,7 +5174,8 @@ const CATALOG = [
       cmp('PB_NC', 'pushbutton', { nc: 'yes' }, 'Push button, normally closed (opens while its key is held)'),
       cmp('PB_NO', 'pushbutton', { nc: 'no' }, 'Push button, normally open (closes while its key is held)'),
       cmp('SPDT', 'spdt', {}, 'Single-pole double-throw switch'),
-      cmp('SPST', 'spst', {}, 'Single-pole single-throw switch') ] },
+      cmp('SPST', 'spst', {}, 'Single-pole single-throw switch'),
+      cmp('TD_SW1', 'tdsw', { ton: '0', toff: '1e9' }, 'Time-delay switch: closes at TON and opens at TOFF (a switch that closes at t = 0)') ] },
     { family: 'TRANSFORMER', comps: [
       cmp('1P1S', 'transformer', { N: '2' }, 'Transformer, one primary and one secondary winding'),
       cmp('TS_IDEAL', 'transformer', { N: '1', Lm: '100' }, 'Near-ideal transformer (1:1)') ] } ] },
@@ -5570,6 +5641,23 @@ function insertInline(doc, part) {
   const clean = (pts) => pts.filter((q, i) => !i || q[0] !== pts[i - 1][0] || q[1] !== pts[i - 1][1]);
   const parts = [clean(first), clean(second)].filter((q) => q.length >= 2).map((pts) => ({ ...w, pts }));
   doc.wires.splice(hit.wi, 1, ...parts);
+  return true;
+}
+// a voltage probe dropped beside a wire or pin moves its tip onto the nearest one within reach (a grid square and a
+// half), so it can't silently float and give V(PR1) no node; false when nothing is in reach
+function snapProbe(doc, part, reach = 1.5 * GRID) {
+  const tips = partPins(part); if (tips.length !== 1) return true;
+  const q = tips[0], cand = [];
+  for (const o of doc.parts) if (o !== part) for (const r of partPins(o)) cand.push([r.x, r.y]);
+  for (const w of doc.wires) for (let s = 1; s < w.pts.length; s++) {
+    const [a, b] = [w.pts[s - 1], w.pts[s]], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    const t = L2 ? Math.max(0, Math.min(1, ((q.x - a[0]) * dx + (q.y - a[1]) * dy) / L2)) : 0, p = [a[0] + t * dx, a[1] + t * dy], g = [snap(p[0]), snap(p[1])];
+    cand.push(onSegment(g, a, b) ? g : p);   // a grid point on the wire when there is one
+  }
+  let best = null, bd = reach + 1e-9;
+  for (const c of cand) { const d = Math.hypot(c[0] - q.x, c[1] - q.y); if (d < bd) { bd = d; best = c; } }
+  if (!best) return false;
+  part.x += best[0] - q.x; part.y += best[1] - q.y;
   return true;
 }
 // replace a library part by another kind in the same place; wires on pins with the same name follow the new pins
@@ -6312,6 +6400,12 @@ const LABS = [
   { id: 'q2-impedance', title: 'Quiz 2: AC impedance reduction network', build: quiz2Impedance },
   { id: 'q2-rc-switch', title: 'Quiz 2: switched RC charge/discharge', build: quiz2RcSwitch },
   { id: 'q2-rlc-damping', title: 'Quiz 2: RLC damping comparison', build: quiz2RlcDamping },
+  { id: 'hw3-fourier', title: 'HW3: Fourier series of a sawtooth (problem 1)', build: hw3Fourier },
+  { id: 'hw3-rl-switch', title: 'HW3: switched two-loop RL circuit (problem 2)', build: hw3RlSwitch },
+  { id: 'hw3-bandpass', title: 'HW3: RLC band-pass frequency response (problem 4)', build: hw3Bandpass },
+  { id: 'hw3-step', title: 'HW3: step response v(t) by Laplace (problem 10)', build: hw3Step },
+  { id: 'hw3-abm', title: 'HW3: 36t e^-6t mA current source (problem 11)', build: hw3Abm },
+  { id: 'hw3-exp', title: 'HW3: 6e^-2t A current source into RLC (problem 12)', build: hw3Exp },
   { id: 'lab2', title: 'Lab 2: voltage divider', build() {
     const { d, at, w } = builder('Lab 2: voltage divider');
     at('dcvoltage', 0, 4, 0, { V: '12' }); at('resistor', 8, 0, 1, { R: '1k' }); at('resistor', 8, 4, 1, { R: '2k' });
@@ -6442,6 +6536,64 @@ function quiz2RcSwitch() {
   });
 }
 
+// HW3: Laplace-transform and Fourier problems; each sample's note gives the hand solution the simulation should match
+const hw3Tran = (tstop, tmax, out, ic = 'zero') => ({ tran: { ic, tstart: '0', tstop, tmaxAuto: false, tmax, tstepAuto: true, tstep: '1e-05', out } });
+function hw3Fourier() {
+  const { d, at } = builder('HW3: Fourier series of a sawtooth', 28, 20);
+  note(at, 0, -15, 'Problem 1 — T = 4 s, half-wave symmetric: odd harmonics only, a_n = 40/(n²π²), b_n = 20/(nπ).', '10');
+  note(at, 0, -12, 'Fourier analysis is ready (f0 = 0.25 Hz). Expected |H1| = 7.547, |H3| = 2.169, even harmonics 0.', '10');
+  const v = at('pwlvoltage', 0, 5, 0, { pts: '0 10, 2 0, 2 -10, 4 0', rep: 'yes' }), r = at('resistor', 14, 5, 1, { R: '1k' }), p = at('mvprobe', 14, 2, 0, { color: 'Red' }), g = at('ground', 4, 11);
+  connect(d, v, '1', r, '1'); connect(d, r, '1', p, '1'); connect(d, r, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'fourier', { fourier: { f0: '0.25', harmonics: '9', tstop: '', out: ['V(PR1)'] }, ...hw3Tran('8', '1m', ['V(PR1)']) });
+}
+function hw3RlSwitch() {
+  const { d, at } = builder('HW3: switched two-loop RL circuit', 28, 20);
+  note(at, 0, -15, 'Problem 2 — J1 closes at t = 0 (TD_SW1, TON = 0) with both inductor currents zero. Transient is ready.', '10');
+  note(at, 0, -12, 'Laplace: i1 = 15 − 14e^(−2t) − e^(−12t) A in L1;  i2 = 7 − 8.4e^(−2t) + 1.4e^(−12t) A in L2.', '10');
+  const v = at('dcvoltage', 0, 5, 0, { V: '336' }), sw = at('tdsw', 7, 0, 0, { ton: '0', toff: '1e9' }), l1 = at('inductor', 14, 0, 0, { L: '8.4' });
+  const r1 = at('resistor', 20, 5, 1, { R: '42' }), l2 = at('inductor', 26, 0, 0, { L: '10' }), r2 = at('resistor', 32, 5, 1, { R: '48' }), g = at('ground', 8, 11);
+  connect(d, v, '1', sw, '1'); connect(d, sw, '2', l1, '1'); connect(d, l1, '2', r1, '1'); connect(d, l1, '2', l2, '1'); connect(d, l2, '2', r2, '1');
+  connect(d, r1, '2', g, '1'); connect(d, r2, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('3', '1m', ['I(L1)', 'I(L2)'], 'auto'));
+}
+function hw3Bandpass() {
+  const { d, at } = builder('HW3: RLC band-pass', 28, 20);
+  note(at, 0, -15, 'Problem 4 — series RLC band-pass, output across R. AC Sweep is ready (1 Hz to 1 kHz).', '10');
+  note(at, 0, -12, 'H(s) = (R/L)s / (s² + (R/L)s + 1/LC): ω0 = 192.5 rad/s (30.63 Hz), |H| = 1 there, bandwidth R/L = 11.1 rad/s.', '10');
+  const v = at('acvoltage', 0, 5, 0, { A: '1', acm: '1', f: '30.63' }), l = at('inductor', 13, 1, 0, { L: '2.7' }), c = at('capacitor', 20, 1, 0, { C: '10u' });
+  const r = at('resistor', 27, 5, 1, { R: '30' }), p = at('mvprobe', 27, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', l, '1'); connect(d, l, '2', c, '1'); connect(d, c, '2', r, '1'); connect(d, r, '1', p, '1'); connect(d, r, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'ac', { ac: { fstart: '1', fstop: '1k', sweep: 'dec', points: '200', vscale: 'lin', out: ['V(PR1)'] } });
+}
+function hw3Step() {
+  const { d, at } = builder('HW3: step response by Laplace', 28, 20);
+  note(at, 0, -15, 'Problem 10 — vs = 2u(t) V, R1 = 1 Ω, C = 0.3689 F, R2 = 3 Ω, L = 0.2259 H. Transient from rest is ready.', '10');
+  note(at, 0, -12, 'V(s) = 24(3 + 0.2259s) / [s(s + 4)(s + 12)]  →  v(t) = 1.5 − 1.572e^(−4t) + 0.072e^(−12t) V.', '10');
+  const v = at('step', 0, 5, 0, { V0: '0', V1: '2', ts: '0', tr: '1n' }), r1 = at('resistor', 9, 1, 0, { R: '1' }), c = at('capacitor', 15, 5, 1, { C: '0.3689' });
+  const r2 = at('resistor', 33, 1, 0, { R: '3' }), l = at('inductor', 39, 5, 1, { L: '0.2259' }), p = at('mvprobe', 15, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', c, '1'); connect(d, c, '1', p, '1'); connect(d, r1, '2', r2, '1'); connect(d, r2, '2', l, '1');
+  connect(d, c, '2', g, '1'); connect(d, l, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('2', '1m', ['V(PR1)']));
+}
+function hw3Abm() {
+  const { d, at } = builder('HW3: 36t e^-6t mA current source', 28, 20);
+  note(at, 0, -15, 'Problem 11 — is(t) = 36t e^(−6t) mA (ABM current source), R1 = 2 Ω, C = 1/8 F, R2 = 4 Ω, all in parallel.', '10');
+  note(at, 0, -12, 'V(s) = 8 Is/(s + 6) = 0.288/(s + 6)³  →  i(t) = v/4 = 36t² e^(−6t) mA (peak 0.541 mA at t = 1/3 s).', '10');
+  const s = at('abmcurrent', 0, 5, 0, { expr: '36m*TIME*exp(-6*TIME)' }), r1 = at('resistor', 27, 5, 1, { R: '2' }), c = at('capacitor', 33, 5, 1, { C: '0.125' });
+  const r2 = at('resistor', 39, 5, 1, { R: '4' }), g = at('ground', 8, 11);
+  connect(d, s, '1', r1, '1'); connect(d, r1, '1', c, '1'); connect(d, c, '1', r2, '1'); connect(d, s, '2', g, '1'); connect(d, r1, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, r2, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('3', '1m', ['I(R2)']));
+}
+function hw3Exp() {
+  const { d, at } = builder('HW3: 6e^-2t A current source into RLC', 28, 20);
+  note(at, 0, -15, 'Problem 12 — is(t) = 6e^(−2t) u(t) A (EXPONENTIAL_CURRENT: initial 6, pulsed 0, rise time constant 0.5 s).', '10');
+  note(at, 0, -12, 'R1 = 10 Ω, R2 = 5 Ω, L = 0.6196 H, LC = 1/15 s² (C = 0.10759 F). Transient from rest plots iL = I(L1).', '10');
+  const s = at('expcurrent', 0, 5, 0, { V1: '6', V2: '0', td1: '0', tau1: '0.5', td2: '1e9', tau2: '1' }), r1 = at('resistor', 14, 5, 1, { R: '10' });
+  const c = at('capacitor', 20, 1, 0, { C: '0.10759' }), r2 = at('resistor', 26, 5, 1, { R: '5' }), l = at('inductor', 32, 5, 1, { L: '0.6196' }), g = at('ground', 8, 11);
+  connect(d, s, '1', r1, '1'); connect(d, r1, '1', c, '1'); connect(d, c, '2', r2, '1'); connect(d, r2, '1', l, '1');
+  connect(d, s, '2', g, '1'); connect(d, r1, '2', g, '1'); connect(d, r2, '2', g, '1'); connect(d, l, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('5', '1m', ['I(L1)']));
+}
 function quiz2RlcDamping() {
   const b = builder('Quiz 2: RLC damping comparison', 28, 20), { d, at } = b;
   note(at, 0, -7, 'Problem 8 — Parameter Sweep is ready for R1 = 10, 100, 400, and 2200 Ohm.', '10');
@@ -10045,7 +10197,8 @@ const prefs = (() => { const d = { wheel: 'zoom', realtime: true, toolbox: true,
 const savePrefs = () => { try { localStorage.setItem('me230.prefs', JSON.stringify(prefs)); } catch { /* per-viewer convenience only */ } };
 function status(msg, err = false) { const s = $('stMsg'); s.textContent = msg; s.classList.toggle('err', !!err); }
 let hintTimer = null;
-function statusHint(msg) { status(msg); clearTimeout(hintTimer); hintTimer = setTimeout(() => { if (!cur || !cur.sim) status('Ready'); }, 8000); }
+// a hint clears itself after 8 s, unless something else has written the status bar since
+function statusHint(msg) { status(msg); clearTimeout(hintTimer); hintTimer = setTimeout(() => { if ($('stMsg').textContent === msg && (!cur || !cur.sim)) status('Ready'); }, 8000); }
 
 /* ---------- designs ---------- */
 const files = []; let cur = null, seq = 1, designNo = 1;
@@ -10323,18 +10476,22 @@ function finishShape(st) {
 function placeAt(st, x, y) {
   const pl = st.placing; if (!pl) return;
   commit(st);
+  let hint = '';
   if (pl.clip) {
     const r = pasteClip(st.doc, pl.clip, snap(x) - pl.anchor[0], snap(y) - pl.anchor[1]);
     st.sel = { parts: new Set(r.parts.map((p) => p.id)), wires: new Set(r.wires) };
   } else {
     const p = addPart(st.doc, pl.type, x, y); p.rot = pl.rot || 0; p.mirror = !!pl.mirror; p.params = { ...p.params, ...pl.params }; if (pl.cat) p.cat = { ...pl.cat };
     if (pl.type === 'arduino' && !st.doc.sketch) st.doc.sketch = BLINK;
-    if (LIBRARY[pl.type].inline && !insertInline(st.doc, p)) statusHint('The current probe isn’t on a wire: wire its two ends, or place it on a wire.');
+    if (LIBRARY[pl.type].inline && !insertInline(st.doc, p)) hint = 'The current probe isn’t on a wire: wire its two ends, or place it on a wire.';
+    else if (LIBRARY[pl.type].mprobe && !LIBRARY[pl.type].inline && !snapProbe(st.doc, p)) hint = `${p.ref} isn’t on a wire or pin, so it reads nothing: move its tip onto one.`;
     st.sel = { parts: new Set([p.id]), wires: new Set() };
   }
   st.placing = null; status('Ready');
   afterEdit(st);
-  if (pl.repeat) { startPlacing(pl.type, null, { repeat: true }); return; }   // probes keep placing until Esc, as in Multisim
+  if (pl.repeat) startPlacing(pl.type, null, { repeat: true });   // probes keep placing until Esc, as in Multisim
+  if (hint) statusHint(hint);   // last, so the placing prompt doesn't cover it
+  if (pl.repeat) return;
   if (pl.type === 'text' || pl.type === 'comment') { const p = st.doc.parts[st.doc.parts.length - 1]; if (p && p.type === pl.type) openProps(st, p); }
   if (pl.reopen) openComponentBrowser(ctx, pl.reopen);   // as in Multisim, the dialog comes back for the next part
 }
@@ -11125,7 +11282,7 @@ function applyLayout() {
 function erc(st) {
   const res = [];
   if (!hasGround(st)) res.push({ type: 'Error', text: 'The circuit has no ground reference.' });
-  for (const c of st.circuit.comps) for (const [p, n] of Object.entries(c.pins)) if ((n === '?' || !n) && !/^X(SC|BP|FG)/i.test(c.ref) && !['xsc', 'xsc4', 'xscat', 'xtek', 'xbp', 'xfg', 'xwm', 'xfc', 'xcp', 'xiv', 'xda', 'xsa', 'agfg', 'agdmm', 'arduino', 'hbridge'].includes(c.lib)) res.push({ type: 'Warning', text: `Pin ${p} is not connected.`, where: c.ref });
+  for (const c of st.circuit.comps) for (const [p, n] of Object.entries(c.pins)) if ((n === '?' || !n) && !/^X(SC|BP|FG)/i.test(c.ref) && !['xsc', 'xsc4', 'xscat', 'xtek', 'xbp', 'xfg', 'xwm', 'xfc', 'xcp', 'xiv', 'xda', 'xsa', 'agfg', 'agdmm', 'arduino', 'hbridge'].includes(c.lib)) res.push({ type: 'Warning', text: LIBRARY[c.lib] && LIBRARY[c.lib].mprobe ? `Probe ${c.ref} isn’t on a wire or pin; V(${c.ref}) has no node until its tip touches one.` : `Pin ${p} is not connected.`, where: c.ref });
   const cnt = new Map(); for (const c of st.circuit.comps) for (const n of Object.values(c.pins)) cnt.set(n, (cnt.get(n) || 0) + 1);
   for (const [n, k] of cnt) if (k === 1 && n !== '?' && n !== '0' && !/^nc_/i.test(n)) res.push({ type: 'Warning', text: `Net ${n} connects to only one pin.`, where: n });
   st.results = res.length ? res : [{ type: 'Info', text: 'ERC found no errors.' }];
@@ -11174,8 +11331,10 @@ function samplesWin() {
   WM.open({ id, title: 'Open Samples - ME230 circuits', modal: true, body: h('div', { class: 'startcard' },
     h('p', { class: 'note', text: 'Quiz 2 review circuits, with the correct analysis and output variables already selected.' }),
     buttons((l) => l.id.startsWith('q2-'), /^Quiz 2: /),
+    h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'HW3 (Laplace transform, transfer functions, Fourier series): each circuit notes the hand solution to compare with. Press F5.' }),
+    buttons((l) => l.id.startsWith('hw3-'), /^HW3: /),
     h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'Starter circuits for the ME230 labs. Open one and press Run (F5); double-click an instrument to see its panel.' }),
-    buttons((l) => !l.id.startsWith('q2-') && !l.id.startsWith('ino-')),
+    buttons((l) => !/^(q2|hw3|ino)-/.test(l.id)),
     h('p', { class: 'note', style: { margin: '10px 0 4px' }, text: 'The course’s Arduino sketches (BareMinimum), each on a circuit to run it. MCU » Arduino sketch shows the code and the Serial Monitor.' }),
     buttons((l) => l.id.startsWith('ino-'), /^Arduino: /),
     h('div', { class: 'dlgbtns' }, h('button', { class: 'btn', text: 'Close', onclick: () => WM.close(id) }))) });

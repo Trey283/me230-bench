@@ -1,6 +1,16 @@
 # Test report
 
-**v1.14 (guest memory and encrypted online lockers): 356 tests, all passing.** 74 unit, 86 simulation, 196 in-browser.
+**v1.15 (HW3: Laplace, transfer functions, Fourier; Multisim's PWL/EXP/ABM sources and TD switch): 372 tests, all passing.** 74 unit, 95 simulation, 203 in-browser.
+
+## Added in v1.15
+
+**New parts (`tests/sim/library.test.mjs`, 1 test):** PIECEWISE_LINEAR_VOLTAGE/CURRENT (a repeated time is a 1 ns step; Repeat data repeats the table), EXPONENTIAL_VOLTAGE/CURRENT, PULSE_CURRENT, ABM_VOLTAGE/CURRENT (any expression of TIME, V(node), I(source), u()) and TD_SW1 (closed from TON to TOFF, or until TOFF and again from TON; TON = 0 is still open at the operating point so i(0−) = 0). Each is checked through the WASM engine against its formula. Two engine pitfalls found and fixed: PWL times were rounded to 6 digits, merging `2` and `2.000001` into a slope; and ngspice holds an EXP source at its initial value for one TSTEP when TD1 = 0 (a 1% error in 6e^−2t u(t) problems), so TD1 = 0 is written as 1 ps.
+
+**HW3 samples (`tests/sim/labs.test.mjs`, 7 tests):** six circuits from ME230 HW3, each against the hand solution: problem 1 sawtooth Fourier series (|H1| = 7.547, |H3| = 2.169, even harmonics < 1%), problem 2 switched two-loop RL (i1 = 15 − 14e^−2t − e^−12t, i2 = 7 − 8.4e^−2t + 1.4e^−12t), problem 4 RLC band-pass (30.63 Hz, |H| = 1), problem 10 step response (1.5 − 1.572e^−4t + 0.072e^−12t), problem 11 ABM current 36t e^−6t mA (i = 36t² e^−6t mA), problem 12 exponential current 6e^−2t A into an RLC (against an RK4 integration of the circuit, cross-checked by a Talbot inverse Laplace).
+
+**Probes (`tests/sim/probes.test.mjs`, 1 test):** a voltage probe dropped within a grid square and a half of a wire or pin moves its tip onto it; one dropped far from everything stays put, floats, and the status bar says so. ERC names a floating probe. Placement hints were overwritten by the "Ready" and placing prompts the moment they appeared, and a hint's 8 s timer could erase a later error message; both fixed.
+
+**Browser (+7):** Open samples lists the HW3 circuits; problems 2 and 11 run from F5 to their hand values; a probe dropped one grid square off a wire joins the node, one dropped in empty sheet reports it reads nothing, ERC names it, and a Transient with V() of that probe names the probe instead of "didn't produce results".
 
 ## Added in v1.14
 

@@ -172,6 +172,39 @@ const meterDef = (vm, horiz) => ({ label: `${vm ? 'Voltmeter' : 'Ammeter'} (${ho
   params: [{ key: 'R', label: vm ? 'Resistance (R)' : 'Resistance (R)', unit: 'Ω', def: vm ? '10Meg' : '1n' }, { key: 'mode', label: 'Mode', options: ['DC', 'AC'], def: 'DC' }, { key: 'rev', label: 'Reversed polarity', options: ['no', 'yes'], def: 'no' }],
   spice: (p) => ({ template: `x%p ${p.rev === 'yes' ? '%t2 %t1' : '%t1 %t2'} ${vm ? 'Voltmeter' : 'Ammeter'}%p\n.subckt ${vm ? 'Voltmeter' : 'Ammeter'}%p 1 2\n${vm ? `R1 1 2 ${p.R}` : `Vam 1 3 dc 0\nR1 3 2 ${p.R}`}\n.ends`, params: [] }),
   value: () => '', meter: vm ? 'volt' : 'amp' });
+// Piecewise linear, exponential and ABM sources, voltage (V) or current (I): current leaves at pin 1, as for every source
+const srcHead = (K) => (K === 'V' ? 'v%p %t1 %t2' : 'i%p %t2 %t1');
+// "0 0, 1m 5, 2m -5" (time value pairs; commas, spaces or new lines) -> [[0, 0], [1e-3, 5], [2e-3, -5]], times kept increasing
+export function pwlPoints(text) {
+  const n = String(text ?? '').trim().split(/[\s,;]+/).filter(Boolean).map((x) => num0(x.replace('µ', 'u'), NaN)), out = [];
+  for (let i = 0; i + 1 < n.length; i += 2) {
+    if (!isFinite(n[i]) || !isFinite(n[i + 1]) || (out.length && n[i] < out[out.length - 1][0])) continue;
+    out.push([out.length && n[i] === out[out.length - 1][0] ? n[i] + 1e-9 : n[i], n[i + 1]]);   // a repeated time is a step: 1 ns
+  }
+  return out.length ? out : [[0, 0]];
+}
+const pwfmt = (x) => String(+(+x).toPrecision(12));   // pwl times at full precision (pfmt would merge 2 and 2.000001)
+const pwlSrc = (K) => ({ label: `Piecewise linear ${K === 'V' ? 'voltage' : 'current'}`, prefix: K, family: `SIGNAL_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}_SOURCES`, part: `PIECEWISE_LINEAR_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}`,
+  pins: SRC2, box: box(-2, -2, 2, 2), sym: K === 'V' ? 'pwlsrc' : 'pwlisrc',
+  params: [{ key: 'pts', label: `Points (time ${K === 'V' ? 'V' : 'A'}, ...)`, def: '0 0, 1m 1, 2m -1, 3m 0' }, { key: 'rep', label: 'Repeat data', options: ['no', 'yes'], def: 'no' }],
+  spice: (p) => { const P = pwlPoints(p.pts); return { template: `${srcHead(K)} dc ${pfmt(P[0][1])} ac 1 pwl(${P.map(([t, y]) => `${pwfmt(t)} ${pfmt(y)}`).join(' ')})${p.rep === 'yes' && P.length > 1 ? ' r=0' : ''}`, params: [] }; },
+  value: (p) => `PWL${p.rep === 'yes' ? ' (repeat)' : ''}` });
+// SPICE EXP: V1 until TD1, then towards V2 with TAU1; from TD2 back towards V1 with TAU2. 6e^-2t u(t): V1 = 6, V2 = 0, TAU1 = 0.5
+// (ngspice holds V1 for one TSTEP when TD1 = 0, which skews a u(t) problem by ~1%; 1 ps starts the change at t = 0)
+const expSrc = (K) => { const u = K === 'V' ? 'V' : 'A';
+  return { label: `Exponential ${K === 'V' ? 'voltage' : 'current'}`, prefix: K, family: `SIGNAL_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}_SOURCES`, part: `EXPONENTIAL_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}`,
+    pins: SRC2, box: box(-2, -2, 2, 2), sym: K === 'V' ? 'expsrc' : 'expisrc',
+    params: [{ key: 'V1', label: 'Initial value', unit: u, def: '0' }, { key: 'V2', label: 'Pulsed value', unit: u, def: '1' }, { key: 'td1', label: 'Rise delay time', unit: 's', def: '0' },
+      { key: 'tau1', label: 'Rise time constant', unit: 's', def: '1m' }, { key: 'td2', label: 'Fall delay time', unit: 's', def: '1e9' }, { key: 'tau2', label: 'Fall time constant', unit: 's', def: '1m' }],
+    spice: (p) => ({ template: `${srcHead(K)} dc ${pfmt(num0(p.V1, 0))} ac 1 exp(${[p.V1, p.V2, p.td1, p.tau1, p.td2, p.tau2].map((x, i) => pfmt(i === 2 ? num0(x, 0) || 1e-12 : num0(x, [0, 1, 0, 1e-3, 1e9, 1e-3][i]))).join(' ')})`, params: [] }),
+    value: (p) => `${p.V1} ${u} -> ${p.V2} ${u}\nτ = ${p.tau1}s` }; };
+// ABM (analog behavioural) source: any expression of TIME, node voltages V(N1) and source currents I(V1), as ngspice's B source
+const abmSrc = (K) => ({ label: `ABM ${K === 'V' ? 'voltage' : 'current'} source`, prefix: K, family: `CONTROLLED_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}_SOURCES`, part: `ABM_${K === 'V' ? 'VOLTAGE' : 'CURRENT'}`,
+  pins: SRC2, box: box(-2, -2, 2, 2), sym: K === 'V' ? 'abmsrc' : 'abmisrc',
+  params: [{ key: 'expr', label: `${K === 'V' ? 'Voltage' : 'Current'} expression`, def: K === 'V' ? '5*exp(-TIME/1m)' : '36m*TIME*exp(-6*TIME)' }],
+  // spaces out: the netlist writer reads " + " as a continuation line; engineering suffixes as numbers ngspice's B source parses
+  spice: (p) => ({ template: `b${K === 'V' ? '%p %t1 %t2 v' : '%p %t2 %t1 i'}=${String(p.expr || '0').replace(/\s+/g, '').replace(/(\d(?:\.\d*)?)(meg|[munpkgf])(?![a-z(])/gi, (_, d, s) => `${d}${({ meg: 'e6', m: 'e-3', u: 'e-6', n: 'e-9', p: 'e-12', k: 'e3', g: 'e9', f: 'e-15' })[s.toLowerCase()]}`)}`, params: [] }),
+  value: (p) => `${K}=${p.expr}` });
 // measurement probes (Place » Probe): colour names as in Multisim's probe properties
 export const PROBE_COLORS = { Yellow: '#f0c800', Red: '#ff3030', Green: '#28b828', Blue: '#3a78ff', Magenta: '#d040d0', Cyan: '#20b8c8', Orange: '#ff8c1a' };
 const probeCol = (p) => PROBE_COLORS[p.color] || PROBE_COLORS.Yellow;
@@ -259,6 +292,7 @@ export const LIBRARY = {
     spice: (p) => { const V0 = num0(p.V0, 0), V1 = num0(p.V1, 5), ts = num0(p.ts, 0), tr = Math.max(1e-12, num0(p.tr, 1e-8));
       return { template: `v%p %t1 %t2 dc ${pfmt(V0)} pwl(0 ${pfmt(V0)} ${pfmt(ts)} ${pfmt(V0)} ${pfmt(ts + tr)} ${pfmt(V1)} ${pfmt(ts + tr + 1)} ${pfmt(V1)})`, params: ['0', p.V1] }; },
     value: (p) => `${p.V0} V -> ${p.V1} V\n${p.ts}s` },
+  pwlvoltage: pwlSrc('V'), expvoltage: expSrc('V'),
   dcinteractive: { label: 'DC interactive voltage', prefix: 'V', family: 'SIGNAL_VOLTAGE_SOURCES', part: 'DC_INTERACTIVE_VOLTAGE', pins: SRC2, box: box(-2, -2, 2, 2), sym: 'dcinteractive',
     params: [{ key: 'Vmax', label: 'Maximum value', unit: 'V', def: '10' }, { key: 'Vmin', label: 'Minimum value', unit: 'V', def: '0' }, { key: 'key', label: 'Key', options: [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'], def: 'A' },
       { key: 'inc', label: 'Increment', unit: '%', def: '5' }, { key: 'setting', label: 'Setting', unit: '%', def: '50' }], interactive: 'vdc',
@@ -280,6 +314,12 @@ export const LIBRARY = {
     params: [{ key: 'A', label: 'Current (Pk)', unit: 'A', def: '1' }, { key: 'off', label: 'Current offset', unit: 'A', def: '0' }, { key: 'f', label: 'Frequency (F)', unit: 'Hz', def: '1k' }, { key: 'ph', label: 'Phase', unit: '°', def: '0' }],
     spice: (p) => ({ template: `i%p %t2 %t1 dc ${pfmt(num0(p.off, 0))} ac ${pfmt(num0(p.A, 1))} ${pfmt(num0(p.ph, 0))} sin(${pfmt(num0(p.off, 0))} ${pfmt(num0(p.A, 1))} ${pfmt(num0(p.f, 1e3))} 0 0 ${pfmt(num0(p.ph, 0))})`, params: ['0', p.A] }),
     value: (p) => `${p.A}Apk\n${p.f}Hz\n${p.ph}°` },
+  pulsecurrent: { label: 'Pulse current', prefix: 'I', family: 'SIGNAL_CURRENT_SOURCES', part: 'PULSE_CURRENT', pins: SRC2, box: box(-2, -2, 2, 2), sym: 'pulseisrc',
+    params: [{ key: 'V1', label: 'Initial value', unit: 'A', def: '0' }, { key: 'V2', label: 'Pulsed value', unit: 'A', def: '1' }, { key: 'td', label: 'Delay time', unit: 's', def: '0' },
+      { key: 'tr', label: 'Rise time', unit: 's', def: '1n' }, { key: 'tf', label: 'Fall time', unit: 's', def: '1n' }, { key: 'pw', label: 'Pulse width', unit: 's', def: '500u' }, { key: 'per', label: 'Period', unit: 's', def: '1m' }],
+    spice: (p) => ({ template: `i%p %t2 %t1 dc ${pfmt(num0(p.V1, 0))} ac 1 pulse(${[p.V1, p.V2, p.td, p.tr, p.tf, p.pw, p.per].map((x, i) => pfmt(num0(x, [0, 1, 0, 1e-9, 1e-9, 5e-4, 1e-3][i]))).join(' ')})`, params: ['0', p.V2] }),
+    value: (p) => `${p.V1} A ${p.V2} A\n${p.pw}s ${p.per}s` },
+  pwlcurrent: pwlSrc('I'), expcurrent: expSrc('I'),
   dciinteractive: { label: 'DC interactive current', prefix: 'I', family: 'SIGNAL_CURRENT_SOURCES', part: 'DC_INTERACTIVE_CURRENT', pins: SRC2, box: box(-2, -2, 2, 2), sym: 'dciinteractive',
     params: [{ key: 'Vmax', label: 'Maximum value', unit: 'A', def: '1' }, { key: 'Vmin', label: 'Minimum value', unit: 'A', def: '0' }, { key: 'key', label: 'Key', options: [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'], def: 'A' },
       { key: 'inc', label: 'Increment', unit: '%', def: '5' }, { key: 'setting', label: 'Setting', unit: '%', def: '50' }], interactive: 'idc',
@@ -294,6 +334,7 @@ export const LIBRARY = {
     params: [{ key: 'k', label: 'Transresistance (H)', unit: 'Ω', def: '1' }], spice: (p) => ({ template: `x%p %t1 %t2 %t3 %t4 CCVS%p\n.subckt CCVS%p 1 2 3 4\nVs 3 4 dc 0\nH1 1 2 Vs ${p.k}\n.ends`, params: [] }), value: (p) => `${p.k} Ω` },
   cccs: { label: 'Current-controlled current source', prefix: 'I', family: 'CONTROLLED_CURRENT_SOURCES', part: 'CURRENT_CONTROLLED_CURRENT_SOURCE', pins: [P('1', 1, -3), P('2', 1, 3), P('3', -2, -3), P('4', -2, 3)], box: box(-1, -2, 3, 2), sym: 'cccs',
     params: [{ key: 'k', label: 'Current gain (F)', unit: 'A/A', def: '1' }], spice: (p) => ({ template: `x%p %t1 %t2 %t3 %t4 CCCS%p\n.subckt CCCS%p 1 2 3 4\nVs 3 4 dc 0\nF1 2 1 Vs ${p.k}\n.ends`, params: [] }), value: (p) => `${p.k} A/A` },
+  abmvoltage: abmSrc('V'), abmcurrent: abmSrc('I'),
   ground: { label: 'Ground', prefix: 'GND', family: 'POWER_SOURCES', part: 'GROUND', pins: [P('1', 0, 0)], box: box(-1, 0, 1, 1.6), sym: 'ground', params: [], spice: () => ({ template: '', params: [] }) },
   dgnd: { label: 'Digital ground', prefix: 'GND', family: 'POWER_SOURCES', part: 'DGND', pins: [P('1', 0, 0)], box: box(-1, 0, 1, 1.9), sym: 'dgnd', params: [], spice: () => ({ template: '', params: [] }) },
   rail: { label: 'Supply rail (VCC/VEE)', prefix: 'VR', family: 'POWER_SOURCES', part: 'VCC', pins: [P('1', 0, 0)], box: box(-1, -1.6, 1, 0), sym: (p) => SYMBOLS[/^(VEE|VSS)$/i.test(p.name) ? 'railneg' : 'rail'](),
@@ -347,6 +388,14 @@ export const LIBRARY = {
     spice: () => ({ template: 'x%p %t1 %t2 Switch%p\n.subckt Switch%p 1 2\nV2 5 0 DC 0\nR1 5 6 20\nV1 6 0 DC 0\nW0 1 2 V1 SWNO\n.model SWNO csw(it=0.0375 ih=0.0125 ron=1m roff=1e12)\n.ends', params: [] }), value: keyLabel }),
   spdt: sw({ label: 'Switch (SPDT)', part: 'SPDT', pins: [P('COM', -2, 0), P('A', 2, -1), P('B', 2, 1)], box: box(-1.4, -1.4, 1.4, 1.4),
     spice: () => ({ template: 'x%p %tCOM %tA %tB Switch%p\n.subckt Switch%p 1 2 3\nV2 5 0 DC 0\nR1 5 6 20\nV1 6 0 DC 0\nW0 1 2 V1 NC_contact\nW1 1 3 V1 NO_contact\n.model NC_contact csw(it=0.0375 ih=0.0125 ron=1e12 roff=1m)\n.model NO_contact csw(it=0.0375 ih=0.0125 ron=1m roff=1e12)\n.ends', params: [] }), value: keyLabel }),
+  // TD_SW1: closed from TON to TOFF (TON < TOFF), or closed until TOFF and again from TON (TOFF < TON); a switch at
+  // TON = 0 is still open at the operating point, so i(0-) = 0 as in a "switch closes at t = 0" problem
+  tdsw: { label: 'Time-delay switch', prefix: 'J', family: 'SWITCH', part: 'TD_SW1', pins: [P('1', -2, 0), P('2', 2, 0)], box: box(-1.4, -1.4, 1.4, 0.4), sym: 'tdsw',
+    params: [{ key: 'ton', label: 'Time on (TON)', unit: 's', def: '0.5' }, { key: 'toff', label: 'Time off (TOFF)', unit: 's', def: '1e9' }],
+    spice: (p) => { const on = Math.max(0, num0(p.ton, 0.5)), off = Math.max(0, num0(p.toff, 1e9)), e = 1e-9, a = Math.min(on, off), b = Math.max(on, off), s0 = on < off ? 0 : 1;
+      const pts = [[0, s0], [a, s0], [a + e, 1 - s0], ...(b > a ? [[b, 1 - s0], [b + e, s0]] : [])];
+      return { template: `x%p %t1 %t2 TDSwitch%p\n.subckt TDSwitch%p 1 2\nVc 3 0 pwl(${pts.map(([t, y]) => `${pfmt(t)} ${y}`).join(' ')})\nS1 1 2 3 0 TDSW\n.model TDSW sw(vt=0.5 vh=0.1 ron=1m roff=1e12)\n.ends`, params: [] }; },
+    value: (p) => `TON = ${p.ton}s${num0(p.toff, 1e9) < 1e9 ? `\nTOFF = ${p.toff}s` : ''}` },
   pushbutton: sw({ label: 'Push button', part: 'PB_NO', pins: [P('1', -2, 0), P('2', 2, 0)], box: box(-1.4, -1.6, 1.4, 0.4), sym: (p) => SYMBOLS.pushbutton(p.nc === 'yes'), layers: true, momentary: true,
     params: [{ key: 'key', label: 'Key for toggle', options: ['Space', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...'0123456789'], def: 'Space' }, { key: 'nc', label: 'Normally closed', options: ['no', 'yes'], def: 'no' }],
     spice: (p) => ({ template: `x%p %t1 %t2 Switch%p\n.subckt Switch%p 1 2\nV2 5 0 DC 0\nR1 5 6 20\nV1 6 0 DC 0\nW0 1 2 V1 ${p.nc === 'yes' ? 'SWNC' : 'SWNO'}\n.model ${p.nc === 'yes' ? 'SWNC csw(it=0.0375 ih=0.0125 ron=1e12 roff=1m)' : 'SWNO csw(it=0.0375 ih=0.0125 ron=1m roff=1e12)'}\n.ends`, params: [] }), value: keyLabel }),

@@ -1,7 +1,7 @@
 // Place » Probe and the other Place menu items: measurement probes, connectors, junctions and annotations.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newDoc, addPart, addWire, connect, toCircuit, toDrawing, insertInline, deletePart, partPins, buildNets } from '../../src/model.js';
+import { newDoc, addPart, addWire, connect, toCircuit, toDrawing, insertInline, deletePart, partPins, buildNets, snapProbe } from '../../src/model.js';
 import { toNetlist } from '../../src/netlist.js';
 import { outputVariables, toSpiceExpr, defaultAnalyses } from '../../src/analyses.js';
 import { runAnalysis } from '../../src/analysisrun.js';
@@ -64,6 +64,18 @@ test('Transient: a floating probe is named, and variables of deleted parts are d
   assert.deepEqual(p.graphs[0].traces.map((t) => t.name), [`V(${node})`, 'I(R2)']);
   near(p.graphs[0].traces[0].y.at(-1), 8, 1e-6, 'V across R2');
   assert.deepEqual(A.tran.out, [`V(${node})`, 'I(R2)'], 'the stale entries leave the saved selection');
+});
+
+test('a voltage probe dropped beside a wire snaps its tip onto it; one far from everything stays put and says so', () => {
+  const { d, r2 } = divider(), top = pinAt(d, r2, '1');
+  const pr = addPart(d, 'mvprobe', top.x + 7, top.y - 30);   // a few pixels off R2's vertical lead / wire
+  assert.equal(toCircuit(d).comps.find((x) => x.ref === pr.ref).pins['1'], '?', 'floating as dropped');
+  assert.ok(snapProbe(d, pr), 'something within reach');
+  const c = toCircuit(d); assert.equal(c.comps.find((x) => x.ref === pr.ref).pins['1'], c.comps.find((x) => x.ref === r2.ref).pins['1'], 'the tip joined R2’s top node');
+  assert.equal(pr.x % 9, 0, 'on the grid');
+  const far = addPart(d, 'mvprobe', 900, 900), x0 = far.x;
+  assert.equal(snapProbe(d, far), false); assert.equal(far.x, x0, 'not moved');
+  assert.equal(toCircuit(d).comps.find((x) => x.ref === far.ref).pins['1'], '?', 'and it floats');
 });
 
 test('a current probe turns upright to fit a vertical wire', () => {
