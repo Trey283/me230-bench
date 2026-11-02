@@ -10,12 +10,39 @@ const vmap = (r) => { const m = new Map(); if (r && r.data) for (const d of r.da
 const fmtv = (x) => (!isFinite(x) ? String(x) : Math.abs(x) >= 1e5 || (Math.abs(x) < 1e-3 && x !== 0) ? x.toExponential(5) : String(+x.toPrecision(7)));
 const unitOf = (e) => (/^\s*I\(/i.test(e) ? 'A' : /^\s*P\(/i.test(e) ? 'W' : /^\s*V\(/i.test(e) ? 'V' : '');
 
-async function simulate(exec, circuit, name, switches, line, outs, extra = '') {
+function prepare(circuit, name, switches, line, outs, extra = '') {
   if (!outs.length) throw new Error('Select at least one output variable on the Output tab.');
   const exprs = outs.map((e) => toSpiceExpr(e, circuit, { sense: true }));
   const nl = senseNetlist(toNetlist(circuit, name, { switches }), currentRefs(outs), circuit) + '\n' + extra + ROPT + line + '\n.end\n';
   // settype: results of mixed units (a power, a ratio) would otherwise have no type and not be written out
-  const { r, errors } = await exec(nl, ['set units=degrees', 'run', ...exprs.flatMap((x, i) => [`let out${i} = ${x}`, `settype voltage out${i}`])]);
+  return { nl, lets: exprs.flatMap((x, i) => [`let out${i} = ${x}`, `settype voltage out${i}`]) };
+}
+async function simulate(exec, circuit, name, switches, line, outs, extra = '') {
+  const { nl, lets } = prepare(circuit, name, switches, line, outs, extra);
+  const { r, errors } = await exec(nl, ['set units=degrees', 'run', ...lets]);
+  return results(r, errors, outs, nl);
+}
+// Multisim lets a switch's key flip it while a Transient runs (HW2Q4: charge, press Space at ~13 s, discharge). This
+// runs the analysis in slices: live.next(t) paces the run and resolves to the time to stop at next (null when Stop was
+// pressed: the plot keeps what ran), and live.alters() hands over the switch flips to apply there.
+export async function steppedTran(raw, circuit, name, switches, line, outs, live) {
+  const { nl, lets } = prepare(circuit, name, switches, line, outs), tstop = +line.split(/\s+/)[2];
+  let t = 0, started = false;
+  while (t < tstop) {
+    const until = await live.next(t);
+    if (until === null) break;
+    const last = until >= tstop;
+    const { info } = await raw(nl, [...(started ? ['delete all'] : ['source test.cir', 'destroy all']), ...live.alters(),
+      ...(last ? [] : [`stop when time > ${until}`]), started ? 'resume' : 'run', 'let __t = time[length(time) - 1]', 'echo __T=$&__t']);
+    started = true;
+    const m = /__T=(\S+)/.exec(info || ''); if (!m) throw new Error('The transient analysis stopped.');
+    t = last ? tstop : +m[1];
+  }
+  if (!started) return null;
+  const { r, errors } = await raw(nl, ['set units=degrees', ...lets, 'write out.raw']);
+  return results(r, errors, outs, nl);
+}
+function results(r, errors, outs, nl) {
   const V = vmap(r);
   const lost = outs.filter((_, i) => !V.has(`out${i}`));
   if (!V.size || lost.length) {
@@ -42,11 +69,12 @@ function opTable(title, sets) {
     rows: sets[0].outs.map((e, i) => [e, ...sets.map(({ V }) => `${fmtv(creal(V.get(`out${i}`)[0]))} ${unitOf(e)}`.trim())]) } };
 }
 
-export async function runAnalysis({ exec, circuit, name, switches, A, id, rebuild }) {
+export async function runAnalysis({ exec, circuit, name, switches, A, id, rebuild, live }) {
   // with nothing chosen on the Output tab, the probes on the sheet are the outputs
   const s = A[id] || {}, title = analysisLabel(id), chosen = liveOutputs((s.out || []).filter(Boolean), circuit), outs = chosen.length ? chosen : probeOutputs(circuit).map((v) => v.name);
   if (s.out && chosen.length < s.out.length) s.out = chosen;   // forget variables of deleted parts (saved with the design)
   if (id === 'op') return [opTable(title, [await simulate(exec, circuit, name, switches, '.op', outs)])];
+  if (id === 'tran' && live) { const R = await steppedTran(live.raw, circuit, name, switches, analysisLine('tran', s, circuit), outs, live); return R ? [tranPage(title, [R])] : []; }
   if (id === 'tran') return [tranPage(title, [await simulate(exec, circuit, name, switches, analysisLine('tran', s, circuit), outs)])];
   if (id === 'ac') return [acPage(title, [await simulate(exec, circuit, name, switches, analysisLine('ac', s, circuit), outs)], s.vscale)];
   if (id === 'dc') {

@@ -24,6 +24,9 @@ export const LABS = [
   { id: 'hw3-step', title: 'HW3: step response v(t) by Laplace (problem 10)', build: hw3Step },
   { id: 'hw3-abm', title: 'HW3: 36t e^-6t mA current source (problem 11)', build: hw3Abm },
   { id: 'hw3-exp', title: 'HW3: 6e^-2t A current source into RLC (problem 12)', build: hw3Exp },
+  { id: 'mt-critical', title: 'Midterm: critically damped RLC after the switch opens (problem 6)', build: mtCritical },
+  { id: 'mt-rc-discharge', title: 'Midterm: RC switched from source to R2 at t = 0 (problem 7)', build: mtRcDischarge },
+  { id: 'mt-rlc-step', title: 'Midterm: underdamped series RLC step, R = 40 Ω (problem 9)', build: mtRlcStep },
   { id: 'lab2', title: 'Lab 2: voltage divider', build() {
     const { d, at, w } = builder('Lab 2: voltage divider');
     at('dcvoltage', 0, 4, 0, { V: '12' }); at('resistor', 8, 0, 1, { R: '1k' }); at('resistor', 8, 4, 1, { R: '2k' });
@@ -211,6 +214,39 @@ function hw3Exp() {
   connect(d, s, '1', r1, '1'); connect(d, r1, '1', c, '1'); connect(d, c, '2', r2, '1'); connect(d, r2, '1', l, '1');
   connect(d, s, '2', g, '1'); connect(d, r1, '2', g, '1'); connect(d, r2, '2', g, '1'); connect(d, l, '2', g, '1');
   return analysisPreset(d, 'tran', hw3Tran('5', '1m', ['I(L1)']));
+}
+// Midterm review problems that come without a Multisim file; the others open from the course files the review names
+function mtCritical() {
+  const { d, at } = builder('Midterm: critically damped RLC', 28, 20);
+  note(at, 0, -15, 'Problem 6 — V0 = 12 V, R1 = 0.4 Ω, R2 = 1.2 Ω, L = 0.1 H; J1 opens at t = 0. C = 10/36 F makes α = ω0 = 6 (critical).', '10');
+  note(at, 0, -12, 't = 0−: i = 7.5 A, vC = 9 V, iL = 0.  Then vC = (9 + 54t)e^(−6t) V and iL = −90t e^(−6t) A (minimum −5.52 A at t = 1/6 s).', '10');
+  const v = at('dcvoltage', 0, 5, 0, { V: '12' }), r1 = at('resistor', 6, 1, 0, { R: '0.4' }), sw = at('tdsw', 12, 1, 0, { ton: '1e9', toff: '0' });
+  const r2 = at('resistor', 17, 5, 1, { R: '1.2' }), l = at('inductor', 23, 1, 0, { L: '0.1' }), c = at('capacitor', 29, 5, 1, { C: '0.277777778' });
+  const p = at('mvprobe', 29, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', sw, '1'); connect(d, sw, '2', r2, '1'); connect(d, sw, '2', l, '1'); connect(d, l, '2', c, '1'); connect(d, c, '1', p, '1');
+  connect(d, r2, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('2', '1m', ['I(L1)', 'V(PR1)'], 'auto'));
+}
+function mtRcDischarge() {
+  const { d, at } = builder('Midterm: RC switched to R2 at t = 0', 28, 20);
+  note(at, 0, -15, 'Problem 7 — V0 = 12 V, R1 = 30 kΩ, R2 = 120 kΩ, R3 = 60 kΩ, C = 100 µF. The switch moves from 2 (J1) to 1 (J2) at t = 0.', '10');
+  note(at, 0, -12, 'vC(0) = 12·60/(30+60) = 8 V; τ = (R2‖R3)C = 4 s: vC = 8e^(−t/4) V, iC = −0.2e^(−t/4) mA.', '10');
+  const v = at('dcvoltage', 0, 5, 0, { V: '12' }), r1 = at('resistor', 6, 1, 0, { R: '30k' }), j1 = at('tdsw', 12, 1, 0, { ton: '1e9', toff: '0' });
+  const j2 = at('tdsw', 18, 4, 1, { ton: '0', toff: '1e9' }), r2 = at('resistor', 18, 9, 1, { R: '120k' }), r3 = at('resistor', 24, 5, 1, { R: '60k' });
+  const c = at('capacitor', 30, 5, 1, { C: '100u' }), p = at('mvprobe', 30, 2, 0, { color: 'Red' }), g = at('ground', 8, 13);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', j1, '1'); connect(d, j1, '2', r3, '1'); connect(d, r3, '1', c, '1'); connect(d, c, '1', p, '1');
+  connect(d, j1, '2', j2, '1'); connect(d, j2, '2', r2, '1');
+  connect(d, r2, '2', g, '1'); connect(d, r3, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('20', '10m', ['V(PR1)', 'I(C1)'], 'auto'));
+}
+function mtRlcStep() {
+  const { d, at } = builder('Midterm: series RLC step, R = 40 Ω', 28, 20);
+  note(at, 0, -15, 'Problem 9 (Design7 with R = 40 Ω) — 5u(t), L = 10 mH, C = 1 µF: α = 2000 < ω0 = 10⁴, underdamped.', '10');
+  note(at, 0, -12, 'vC = 5 − (5cos 9797.95t + 1.02 sin 9797.95t)e^(−2000t) V: 5.69 V at 1 ms, 4.92 V at 2 ms. Use the Grapher cursors.', '10');
+  const v = at('step', 0, 5, 0, { V0: '0', V1: '5', ts: '0', tr: '1n' }), r = at('resistor', 7, 1, 0, { R: '40' }), l = at('inductor', 14, 1, 0, { L: '10m' });
+  const c = at('capacitor', 20, 5, 1, { C: '1u' }), p = at('mvprobe', 20, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', r, '1'); connect(d, r, '2', l, '1'); connect(d, l, '2', c, '1'); connect(d, c, '1', p, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('5m', '1u', ['V(PR1)']));
 }
 function quiz2RlcDamping() {
   const b = builder('Quiz 2: RLC damping comparison', 28, 20), { d, at } = b;

@@ -2891,7 +2891,8 @@ class Spice {
           if (self.cmd === 0) {
             await new Promise((r) => { self._cont = r; });
             try { m.FS.unlink('out.raw'); } catch {}
-            m.FS.writeFile('/test.cir', self.netlist);
+            // ngspice returns no results for a netlist with non-ASCII text (a design named "R = 40 Ω")
+            m.FS.writeFile('/test.cir', self.netlist.replace(/[^\x00-\x7f]/g, '?'));
           }
         });
       });
@@ -5704,12 +5705,39 @@ const vmap = (r) => { const m = new Map(); if (r && r.data) for (const d of r.da
 const fmtv = (x) => (!isFinite(x) ? String(x) : Math.abs(x) >= 1e5 || (Math.abs(x) < 1e-3 && x !== 0) ? x.toExponential(5) : String(+x.toPrecision(7)));
 const unitOf = (e) => (/^\s*I\(/i.test(e) ? 'A' : /^\s*P\(/i.test(e) ? 'W' : /^\s*V\(/i.test(e) ? 'V' : '');
 
-async function simulate(exec, circuit, name, switches, line, outs, extra = '') {
+function prepare(circuit, name, switches, line, outs, extra = '') {
   if (!outs.length) throw new Error('Select at least one output variable on the Output tab.');
   const exprs = outs.map((e) => toSpiceExpr(e, circuit, { sense: true }));
   const nl = senseNetlist(toNetlist(circuit, name, { switches }), currentRefs(outs), circuit) + '\n' + extra + ROPT + line + '\n.end\n';
   // settype: results of mixed units (a power, a ratio) would otherwise have no type and not be written out
-  const { r, errors } = await exec(nl, ['set units=degrees', 'run', ...exprs.flatMap((x, i) => [`let out${i} = ${x}`, `settype voltage out${i}`])]);
+  return { nl, lets: exprs.flatMap((x, i) => [`let out${i} = ${x}`, `settype voltage out${i}`]) };
+}
+async function simulate(exec, circuit, name, switches, line, outs, extra = '') {
+  const { nl, lets } = prepare(circuit, name, switches, line, outs, extra);
+  const { r, errors } = await exec(nl, ['set units=degrees', 'run', ...lets]);
+  return results(r, errors, outs, nl);
+}
+// Multisim lets a switch's key flip it while a Transient runs (HW2Q4: charge, press Space at ~13 s, discharge). This
+// runs the analysis in slices: live.next(t) paces the run and resolves to the time to stop at next (null when Stop was
+// pressed: the plot keeps what ran), and live.alters() hands over the switch flips to apply there.
+async function steppedTran(raw, circuit, name, switches, line, outs, live) {
+  const { nl, lets } = prepare(circuit, name, switches, line, outs), tstop = +line.split(/\s+/)[2];
+  let t = 0, started = false;
+  while (t < tstop) {
+    const until = await live.next(t);
+    if (until === null) break;
+    const last = until >= tstop;
+    const { info } = await raw(nl, [...(started ? ['delete all'] : ['source test.cir', 'destroy all']), ...live.alters(),
+      ...(last ? [] : [`stop when time > ${until}`]), started ? 'resume' : 'run', 'let __t = time[length(time) - 1]', 'echo __T=$&__t']);
+    started = true;
+    const m = /__T=(\S+)/.exec(info || ''); if (!m) throw new Error('The transient analysis stopped.');
+    t = last ? tstop : +m[1];
+  }
+  if (!started) return null;
+  const { r, errors } = await raw(nl, ['set units=degrees', ...lets, 'write out.raw']);
+  return results(r, errors, outs, nl);
+}
+function results(r, errors, outs, nl) {
   const V = vmap(r);
   const lost = outs.filter((_, i) => !V.has(`out${i}`));
   if (!V.size || lost.length) {
@@ -5736,11 +5764,12 @@ function opTable(title, sets) {
     rows: sets[0].outs.map((e, i) => [e, ...sets.map(({ V }) => `${fmtv(creal(V.get(`out${i}`)[0]))} ${unitOf(e)}`.trim())]) } };
 }
 
-async function runAnalysis({ exec, circuit, name, switches, A, id, rebuild }) {
+async function runAnalysis({ exec, circuit, name, switches, A, id, rebuild, live }) {
   // with nothing chosen on the Output tab, the probes on the sheet are the outputs
   const s = A[id] || {}, title = analysisLabel(id), chosen = liveOutputs((s.out || []).filter(Boolean), circuit), outs = chosen.length ? chosen : probeOutputs(circuit).map((v) => v.name);
   if (s.out && chosen.length < s.out.length) s.out = chosen;   // forget variables of deleted parts (saved with the design)
   if (id === 'op') return [opTable(title, [await simulate(exec, circuit, name, switches, '.op', outs)])];
+  if (id === 'tran' && live) { const R = await steppedTran(live.raw, circuit, name, switches, analysisLine('tran', s, circuit), outs, live); return R ? [tranPage(title, [R])] : []; }
   if (id === 'tran') return [tranPage(title, [await simulate(exec, circuit, name, switches, analysisLine('tran', s, circuit), outs)])];
   if (id === 'ac') return [acPage(title, [await simulate(exec, circuit, name, switches, analysisLine('ac', s, circuit), outs)], s.vscale)];
   if (id === 'dc') {
@@ -6409,6 +6438,9 @@ const LABS = [
   { id: 'hw3-step', title: 'HW3: step response v(t) by Laplace (problem 10)', build: hw3Step },
   { id: 'hw3-abm', title: 'HW3: 36t e^-6t mA current source (problem 11)', build: hw3Abm },
   { id: 'hw3-exp', title: 'HW3: 6e^-2t A current source into RLC (problem 12)', build: hw3Exp },
+  { id: 'mt-critical', title: 'Midterm: critically damped RLC after the switch opens (problem 6)', build: mtCritical },
+  { id: 'mt-rc-discharge', title: 'Midterm: RC switched from source to R2 at t = 0 (problem 7)', build: mtRcDischarge },
+  { id: 'mt-rlc-step', title: 'Midterm: underdamped series RLC step, R = 40 Ω (problem 9)', build: mtRlcStep },
   { id: 'lab2', title: 'Lab 2: voltage divider', build() {
     const { d, at, w } = builder('Lab 2: voltage divider');
     at('dcvoltage', 0, 4, 0, { V: '12' }); at('resistor', 8, 0, 1, { R: '1k' }); at('resistor', 8, 4, 1, { R: '2k' });
@@ -6596,6 +6628,39 @@ function hw3Exp() {
   connect(d, s, '1', r1, '1'); connect(d, r1, '1', c, '1'); connect(d, c, '2', r2, '1'); connect(d, r2, '1', l, '1');
   connect(d, s, '2', g, '1'); connect(d, r1, '2', g, '1'); connect(d, r2, '2', g, '1'); connect(d, l, '2', g, '1');
   return analysisPreset(d, 'tran', hw3Tran('5', '1m', ['I(L1)']));
+}
+// Midterm review problems that come without a Multisim file; the others open from the course files the review names
+function mtCritical() {
+  const { d, at } = builder('Midterm: critically damped RLC', 28, 20);
+  note(at, 0, -15, 'Problem 6 — V0 = 12 V, R1 = 0.4 Ω, R2 = 1.2 Ω, L = 0.1 H; J1 opens at t = 0. C = 10/36 F makes α = ω0 = 6 (critical).', '10');
+  note(at, 0, -12, 't = 0−: i = 7.5 A, vC = 9 V, iL = 0.  Then vC = (9 + 54t)e^(−6t) V and iL = −90t e^(−6t) A (minimum −5.52 A at t = 1/6 s).', '10');
+  const v = at('dcvoltage', 0, 5, 0, { V: '12' }), r1 = at('resistor', 6, 1, 0, { R: '0.4' }), sw = at('tdsw', 12, 1, 0, { ton: '1e9', toff: '0' });
+  const r2 = at('resistor', 17, 5, 1, { R: '1.2' }), l = at('inductor', 23, 1, 0, { L: '0.1' }), c = at('capacitor', 29, 5, 1, { C: '0.277777778' });
+  const p = at('mvprobe', 29, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', sw, '1'); connect(d, sw, '2', r2, '1'); connect(d, sw, '2', l, '1'); connect(d, l, '2', c, '1'); connect(d, c, '1', p, '1');
+  connect(d, r2, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('2', '1m', ['I(L1)', 'V(PR1)'], 'auto'));
+}
+function mtRcDischarge() {
+  const { d, at } = builder('Midterm: RC switched to R2 at t = 0', 28, 20);
+  note(at, 0, -15, 'Problem 7 — V0 = 12 V, R1 = 30 kΩ, R2 = 120 kΩ, R3 = 60 kΩ, C = 100 µF. The switch moves from 2 (J1) to 1 (J2) at t = 0.', '10');
+  note(at, 0, -12, 'vC(0) = 12·60/(30+60) = 8 V; τ = (R2‖R3)C = 4 s: vC = 8e^(−t/4) V, iC = −0.2e^(−t/4) mA.', '10');
+  const v = at('dcvoltage', 0, 5, 0, { V: '12' }), r1 = at('resistor', 6, 1, 0, { R: '30k' }), j1 = at('tdsw', 12, 1, 0, { ton: '1e9', toff: '0' });
+  const j2 = at('tdsw', 18, 4, 1, { ton: '0', toff: '1e9' }), r2 = at('resistor', 18, 9, 1, { R: '120k' }), r3 = at('resistor', 24, 5, 1, { R: '60k' });
+  const c = at('capacitor', 30, 5, 1, { C: '100u' }), p = at('mvprobe', 30, 2, 0, { color: 'Red' }), g = at('ground', 8, 13);
+  connect(d, v, '1', r1, '1'); connect(d, r1, '2', j1, '1'); connect(d, j1, '2', r3, '1'); connect(d, r3, '1', c, '1'); connect(d, c, '1', p, '1');
+  connect(d, j1, '2', j2, '1'); connect(d, j2, '2', r2, '1');
+  connect(d, r2, '2', g, '1'); connect(d, r3, '2', g, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('20', '10m', ['V(PR1)', 'I(C1)'], 'auto'));
+}
+function mtRlcStep() {
+  const { d, at } = builder('Midterm: series RLC step, R = 40 Ω', 28, 20);
+  note(at, 0, -15, 'Problem 9 (Design7 with R = 40 Ω) — 5u(t), L = 10 mH, C = 1 µF: α = 2000 < ω0 = 10⁴, underdamped.', '10');
+  note(at, 0, -12, 'vC = 5 − (5cos 9797.95t + 1.02 sin 9797.95t)e^(−2000t) V: 5.69 V at 1 ms, 4.92 V at 2 ms. Use the Grapher cursors.', '10');
+  const v = at('step', 0, 5, 0, { V0: '0', V1: '5', ts: '0', tr: '1n' }), r = at('resistor', 7, 1, 0, { R: '40' }), l = at('inductor', 14, 1, 0, { L: '10m' });
+  const c = at('capacitor', 20, 5, 1, { C: '1u' }), p = at('mvprobe', 20, 2, 0, { color: 'Red' }), g = at('ground', 8, 11);
+  connect(d, v, '1', r, '1'); connect(d, r, '2', l, '1'); connect(d, l, '2', c, '1'); connect(d, c, '1', p, '1'); connect(d, c, '2', g, '1'); connect(d, v, '2', g, '1');
+  return analysisPreset(d, 'tran', hw3Tran('5m', '1u', ['V(PR1)']));
 }
 function quiz2RlcDamping() {
   const b = builder('Quiz 2: RLC damping comparison', 28, 20), { d, at } = b;
@@ -10634,7 +10699,7 @@ function finishWire(st) {
 
 /* ---------- Simulation (Multisim's interactive simulation) ---------- */
 const isRunning = (st) => !!(st && st.sim && st.sim.state === 'run');
-const simulating = (st) => !!(st && st.sim);
+const simulating = (st) => !!(st && (st.sim || st.tranLive));
 function simLog(st, line, err = false) { st.log.push({ t: new Date(), line, err }); if (st.log.length > 400) st.log.shift(); if (st === cur && ssTab === 'sim') renderSpreadsheet(); }
 const scopeParts = (st) => st.doc.parts.filter((p) => p.type === 'xsc' || p.type === 'xsc4' || p.type === 'xscat' || p.type === 'xtek' || (p.type === 'imported' && /^XSC/i.test(p.ref)));
 function stepFor(st, base) {
@@ -10753,6 +10818,7 @@ function updateLive(st, force = false) {
 function simPause(st = cur) { if (!st || !st.sim || st.sim.state !== 'run') return; st.sim.state = 'pause'; status('Simulation paused'); simLog(st, 'Simulation paused.'); refreshToolbars(); $('stSim').innerHTML = `${esc(st.name)}: Tran: ${engf(st.sim.run.t, 's', 4)} (paused)`; for (const p of ctx.panels.values()) if (p.st === st && p.part) p.update(); }
 function simResume(st) { const S = st.sim; if (!S) return; S.state = 'run'; S.wall0 = performance.now(); S.t0 = S.run.t; status('Simulating…'); simLog(st, 'Simulation resumed.'); refreshToolbars(); simLoop(st); }
 function simStop(st = cur) {
+  if (st && st.tranLive) { st.tranLive.stop = true; return; }
   if (!st || !st.sim) return;
   const S = st.sim; S.state = 'stop';
   if (S.run && S.run.data) st.last = { map: S.map, t: S.run.t, cosim: S.cosim, serial: S.cosim ? S.run.sketch.serial.slice() : null, edits: st.edits || 0 };
@@ -10765,7 +10831,9 @@ const simData = (st) => (st.sim && st.sim.map ? { map: st.sim.map, running: st.s
 function toggleSwitch(st, ref) {
   if (!(ref in st.sw)) return;
   st.sw[ref] = !st.sw[ref];
-  if (st.sim && st.sim.pending) st.sim.pending.push(`alter v.x${ref.toLowerCase()}.v2 dc = ${st.sw[ref] ? 2 : 0}`);
+  const alter = `alter v.x${ref.toLowerCase()}.v2 dc = ${st.sw[ref] ? 2 : 0}`;
+  if (st.sim && st.sim.pending) st.sim.pending.push(alter);
+  else if (st.tranLive) { st.tranLive.pending.push(alter); simLog(st, `${ref} flipped at t = ${engf(st.tranLive.t, 's')}.`); }
   else st.op = null;
   render(st);
 }
@@ -11708,13 +11776,21 @@ async function runOffline(st, id) {
   const t0 = performance.now();
   try {
     const A = analysesOf(st);
-    const pages = await runAnalysis({ exec: (nl, mid) => runSpice(nl, mid), circuit: st.circuit, name: st.name, switches: st.sw, A, id, rebuild: (ref, val) => rebuildWith(st, ref, val) });
+    // with switches on the sheet a Transient runs at the pace of real time, so a switch's key can flip it mid-run
+    const L = id === 'tran' && st.d.switches.length ? (st.tranLive = { pending: [], stop: false, t: 0 }) : null, wall0 = performance.now();
+    const live = L && { raw: (nl, cmds) => runSpice.raw(nl, cmds), alters: () => L.pending.splice(0),
+      async next(t) {
+        L.t = t; refreshToolbars();
+        status(`Transient: t = ${engf(t, 's', 4)}. Press a switch's key to flip it; Stop ends the run here.`);
+        for (;;) { if (L.stop) return null; const wall = (performance.now() - wall0) / 1000; if (wall > t || L.pending.length) return Math.max(t + 1e-9, Math.min(wall, t + 0.25)); await nextFrame(); }
+      } };
+    const pages = await runAnalysis({ exec: (nl, mid) => runSpice(nl, mid), circuit: st.circuit, name: st.name, switches: st.sw, A, id, rebuild: (ref, val) => rebuildWith(st, ref, val), live });
     if (A[id] && A[id].title) pages.forEach((pg) => { pg.title = A[id].title; });
     addGrapherPages(ctx, st, pages);
     status(`${analysisLabel(id)} finished.`); simLog(st, `${analysisLabel(id)} finished in ${((performance.now() - t0) / 1000).toFixed(2)} s.`);
   } catch (e) {
     status(`${analysisLabel(id)}: ${e.message}`, true); simLog(st, `${analysisLabel(id)} error: ${e.message}`, true); message(analysisLabel(id), e.message);
-  } finally { analysisBusy = false; refreshToolbars(); }
+  } finally { analysisBusy = false; st.tranLive = null; refreshToolbars(); }
 }
 function autoFrequency(st) { try { const fs = timeScales(toNetlist(st.circuit, st.name)).freqs.filter((f) => f > 0); return fs.length ? fs[0] : null; } catch { return null; } }
 

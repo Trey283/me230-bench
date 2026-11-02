@@ -2432,7 +2432,8 @@ export class Spice {
           if (self.cmd === 0) {
             await new Promise((r) => { self._cont = r; });
             try { m.FS.unlink('out.raw'); } catch {}
-            m.FS.writeFile('/test.cir', self.netlist);
+            // ngspice returns no results for a netlist with non-ASCII text (a design named "R = 40 Ω")
+            m.FS.writeFile('/test.cir', self.netlist.replace(/[^\x00-\x7f]/g, '?'));
           }
         });
       });

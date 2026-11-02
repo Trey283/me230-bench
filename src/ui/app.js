@@ -383,7 +383,7 @@ function finishWire(st) {
 
 /* ---------- Simulation (Multisim's interactive simulation) ---------- */
 const isRunning = (st) => !!(st && st.sim && st.sim.state === 'run');
-const simulating = (st) => !!(st && st.sim);
+const simulating = (st) => !!(st && (st.sim || st.tranLive));
 function simLog(st, line, err = false) { st.log.push({ t: new Date(), line, err }); if (st.log.length > 400) st.log.shift(); if (st === cur && ssTab === 'sim') renderSpreadsheet(); }
 const scopeParts = (st) => st.doc.parts.filter((p) => p.type === 'xsc' || p.type === 'xsc4' || p.type === 'xscat' || p.type === 'xtek' || (p.type === 'imported' && /^XSC/i.test(p.ref)));
 function stepFor(st, base) {
@@ -502,6 +502,7 @@ function updateLive(st, force = false) {
 function simPause(st = cur) { if (!st || !st.sim || st.sim.state !== 'run') return; st.sim.state = 'pause'; status('Simulation paused'); simLog(st, 'Simulation paused.'); refreshToolbars(); $('stSim').innerHTML = `${esc(st.name)}: Tran: ${engf(st.sim.run.t, 's', 4)} (paused)`; for (const p of ctx.panels.values()) if (p.st === st && p.part) p.update(); }
 function simResume(st) { const S = st.sim; if (!S) return; S.state = 'run'; S.wall0 = performance.now(); S.t0 = S.run.t; status('Simulating…'); simLog(st, 'Simulation resumed.'); refreshToolbars(); simLoop(st); }
 function simStop(st = cur) {
+  if (st && st.tranLive) { st.tranLive.stop = true; return; }
   if (!st || !st.sim) return;
   const S = st.sim; S.state = 'stop';
   if (S.run && S.run.data) st.last = { map: S.map, t: S.run.t, cosim: S.cosim, serial: S.cosim ? S.run.sketch.serial.slice() : null, edits: st.edits || 0 };
@@ -514,7 +515,9 @@ const simData = (st) => (st.sim && st.sim.map ? { map: st.sim.map, running: st.s
 function toggleSwitch(st, ref) {
   if (!(ref in st.sw)) return;
   st.sw[ref] = !st.sw[ref];
-  if (st.sim && st.sim.pending) st.sim.pending.push(`alter v.x${ref.toLowerCase()}.v2 dc = ${st.sw[ref] ? 2 : 0}`);
+  const alter = `alter v.x${ref.toLowerCase()}.v2 dc = ${st.sw[ref] ? 2 : 0}`;
+  if (st.sim && st.sim.pending) st.sim.pending.push(alter);
+  else if (st.tranLive) { st.tranLive.pending.push(alter); simLog(st, `${ref} flipped at t = ${engf(st.tranLive.t, 's')}.`); }
   else st.op = null;
   render(st);
 }
@@ -1457,13 +1460,21 @@ async function runOffline(st, id) {
   const t0 = performance.now();
   try {
     const A = analysesOf(st);
-    const pages = await runAnalysis({ exec: (nl, mid) => runSpice(nl, mid), circuit: st.circuit, name: st.name, switches: st.sw, A, id, rebuild: (ref, val) => rebuildWith(st, ref, val) });
+    // with switches on the sheet a Transient runs at the pace of real time, so a switch's key can flip it mid-run
+    const L = id === 'tran' && st.d.switches.length ? (st.tranLive = { pending: [], stop: false, t: 0 }) : null, wall0 = performance.now();
+    const live = L && { raw: (nl, cmds) => runSpice.raw(nl, cmds), alters: () => L.pending.splice(0),
+      async next(t) {
+        L.t = t; refreshToolbars();
+        status(`Transient: t = ${engf(t, 's', 4)}. Press a switch's key to flip it; Stop ends the run here.`);
+        for (;;) { if (L.stop) return null; const wall = (performance.now() - wall0) / 1000; if (wall > t || L.pending.length) return Math.max(t + 1e-9, Math.min(wall, t + 0.25)); await nextFrame(); }
+      } };
+    const pages = await runAnalysis({ exec: (nl, mid) => runSpice(nl, mid), circuit: st.circuit, name: st.name, switches: st.sw, A, id, rebuild: (ref, val) => rebuildWith(st, ref, val), live });
     if (A[id] && A[id].title) pages.forEach((pg) => { pg.title = A[id].title; });
     addGrapherPages(ctx, st, pages);
     status(`${analysisLabel(id)} finished.`); simLog(st, `${analysisLabel(id)} finished in ${((performance.now() - t0) / 1000).toFixed(2)} s.`);
   } catch (e) {
     status(`${analysisLabel(id)}: ${e.message}`, true); simLog(st, `${analysisLabel(id)} error: ${e.message}`, true); message(analysisLabel(id), e.message);
-  } finally { analysisBusy = false; refreshToolbars(); }
+  } finally { analysisBusy = false; st.tranLive = null; refreshToolbars(); }
 }
 function autoFrequency(st) { try { const fs = timeScales(toNetlist(st.circuit, st.name)).freqs.filter((f) => f > 0); return fs.length ? fs[0] : null; } catch { return null; } }
 

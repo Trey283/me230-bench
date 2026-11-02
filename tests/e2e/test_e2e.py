@@ -532,7 +532,7 @@ with sync_playwright() as p:
     check('Open samples lists all five Quiz 2 review circuits', q2 == ['q2-ac-cap', 'q2-mesh', 'q2-impedance', 'q2-rc-switch', 'q2-rlc-damping'], str(q2))
     pg.keyboard.press('Escape')
     bad = []
-    for lab in [l for l in labs if l != 'lab6' and not l.startswith(('q2-', 'hw3-'))]:   # those open on an offline analysis
+    for lab in [l for l in labs if l != 'lab6' and not l.startswith(('q2-', 'hw3-', 'mt-'))]:   # those open on an offline analysis
         pg.evaluate('id => window.__bench.openLab(id)', lab); pg.wait_for_timeout(100)
         run(pg, 0.4)
         if 'Simulating' not in msg(pg) or pg.locator('#sch .part').count() < 3: bad.append(f'{lab}: {msg(pg)}')
@@ -584,6 +584,27 @@ with sync_playwright() as p:
     an_run()
     pk = pg.evaluate("() => { const t = window.__bench.current().grapher.pages.at(-1).graphs[0].traces[0]; return Math.max(...t.y.map(Math.abs)); }")
     check('HW3 problem 11: the ABM current source gives a 0.541 mA peak in R2', abs(pk - 0.036 / 9 * math.exp(-2)) < 2e-6, str(pk))
+    win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
+
+    # ---------------- midterm review: samples, and Space during a Transient analysis (HW2Q4) ----------------
+    menu(pg, 'File', 'Open samples...')
+    mt = pg.eval_on_selector_all('.win [data-lab^="mt-"]', 'bs => bs.map(b => b.dataset.lab)')
+    pg.keyboard.press('Escape')
+    check('Open samples lists the three midterm review circuits', mt == ['mt-critical', 'mt-rc-discharge', 'mt-rlc-step'], str(mt))
+    pg.evaluate("() => window.__bench.openLab('mt-rlc-step')"); pg.wait_for_timeout(150)
+    an_run()
+    v1 = pg.evaluate("() => { const t = window.__bench.current().grapher.pages.at(-1).graphs[0].traces[0], k = t.x.findIndex(x => x >= 1e-3); return t.y[k]; }")
+    check('midterm problem 9: the R = 40 Ω step response is 5.69 V at 1 ms (a design name with Ω simulates)', abs(v1 - 5.69) < 0.02, str(v1))
+    win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
+    open_files(pg, ['HW2Q4'])
+    pg.evaluate("""() => { const st = window.__bench.current(); st.doc.analyses = { ...(st.doc.analyses || {}), active: 'tran',
+        tran: { ic: 'zero', tstart: '0', tstop: '5', tmaxAuto: false, tmax: '1e-3', tstepAuto: true, tstep: '1e-3', out: ['V(3)'] } }; }""")
+    pg.keyboard.press('F5')
+    pg.wait_for_function("() => { const m = /t = ([\\d.]+) s/.exec(document.getElementById('stMsg').textContent); return m && +m[1] > 1.5; }", timeout=20000)
+    pg.keyboard.press('Space')
+    pg.wait_for_function("() => /finished|error|didn/i.test(document.getElementById('stMsg').textContent)", timeout=30000); pg.wait_for_timeout(250)
+    sw = pg.evaluate("() => { const t = window.__bench.current().grapher.pages.at(-1).graphs[0].traces[0], at = (q) => t.y[t.x.findIndex(x => x >= q)]; return { pre: at(1.4), end: t.y.at(-1), tend: t.x.at(-1) }; }")
+    check('HW2Q4: Space pressed during a Transient analysis flips S1 at that time and the capacitor charges', sw['pre'] < 0.01 and sw['end'] > 1 and abs(sw['tend'] - 5) < 1e-6, str(sw))
     win(pg, 'Grapher View').locator('.wt button[aria-label=Close]').click(); pg.wait_for_timeout(80)
     # Grapher cursors against problem 10's v(t): drag, Set X, zoom (cursors stay on their x), double-click restore, Phase-graph search
     vt = lambda t: 1.5 - 1.5723 * math.exp(-4 * t) + 0.0723 * math.exp(-12 * t)
