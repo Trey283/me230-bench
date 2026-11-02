@@ -11782,7 +11782,9 @@ async function runOffline(st, id) {
       async next(t) {
         L.t = t; refreshToolbars();
         status(`Transient: t = ${engf(t, 's', 4)}. Press a switch's key to flip it; Stop ends the run here.`);
-        for (;;) { if (L.stop) return null; const wall = (performance.now() - wall0) / 1000; if (wall > t || L.pending.length) return Math.max(t + 1e-9, Math.min(wall, t + 0.25)); await nextFrame(); }
+        // one slice per frame: the engine resolves without yielding, so without the frame wait a solver faster than real
+        // time spins in sub-millisecond slices that starve key presses and painting
+        for (;;) { await nextFrame(); if (L.stop) return null; const wall = (performance.now() - wall0) / 1000; if (wall > t || L.pending.length) return Math.max(t + 1e-9, Math.min(wall, t + 0.25)); }
       } };
     const pages = await runAnalysis({ exec: (nl, mid) => runSpice(nl, mid), circuit: st.circuit, name: st.name, switches: st.sw, A, id, rebuild: (ref, val) => rebuildWith(st, ref, val), live });
     if (A[id] && A[id].title) pages.forEach((pg) => { pg.title = A[id].title; });

@@ -624,6 +624,10 @@ with sync_playwright() as p:
     pg.mouse.move(c1 + 2, my); pg.mouse.down(); pg.mouse.move(L + 0.5 * (Rr - L), my, steps=6); pg.mouse.up(); pg.wait_for_timeout(150)
     g = gread(); x1 = num(g['x1'][0])
     check('Grapher: dragging cursor 1 to mid-plot reads x1 = 1 s and y1 = v(1) on the trace', abs(x1 - 1) < 0.01 and abs(num(g['y1'][0]) - vt(x1)) < 2e-3 and not gview(), str(g['x1'] + g['y1']))
+    c2 = L + 0.75 * (Rr - L)   # cursor 2 opens at three quarters (1.5 s); drag it to 0.25 s, left of cursor 1
+    pg.mouse.move(c2 + 2, my); pg.mouse.down(); pg.mouse.move(L + 0.125 * (Rr - L), my, steps=6); pg.mouse.up(); pg.wait_for_timeout(150)
+    g2 = gread(); x2, y2 = num(g2['x2'][0]), num(g2['y2'][0])
+    check('Grapher: dragging cursor 2 updates x2/y2 on the trace, leaves cursor 1, and dx/dy follow', abs(x2 - 0.25) < 0.01 and abs(y2 - vt(x2)) < 2e-3 and g2['x1'] == g['x1'] and abs(num(g2['dy'][0]) - (y2 - num(g2['y1'][0]))) < 2e-3, str(g2['x2'] + g2['y2'] + g2['dy']))
     set_x('250m', '1.75'); g = gread()
     check('Grapher: Set X value puts the cursors at 0.25 s and 1.75 s with y on the trace', g['x1'][0] == '250m' and g['x2'][0] == '1.75' and abs(num(g['y1'][0]) - vt(0.25)) < 2e-3, str(g['x1'] + g['y1'] + g['x2']))
     pg.mouse.move(L + 0.1 * (Rr - L), my - 30); pg.mouse.down(); pg.mouse.move(L + 0.6 * (Rr - L), my - 30, steps=5); pg.mouse.up(); pg.wait_for_timeout(200)
@@ -706,9 +710,9 @@ with sync_playwright() as p:
     stop(pg)
     pg.evaluate("() => window.__bench.openLab('ino-stepper')"); pg.wait_for_timeout(200)
     run(pg, 2.0)
-    st_ang = pg.evaluate("() => parseFloat(document.querySelector('#sch .part[data-ref=M1] text[data-var=\"1\"]').textContent)")
-    simt = sim_t(pg)
-    check('BareMinimum13: the stepper turns at 10 rpm (60°/s of circuit time)', simt and abs(st_ang - 60 * simt) < 8, f'{st_ang}° after {simt} s')
+    # angle and time read together; the angle label redraws every 200 ms (12° at 60°/s), so it may trail by that much
+    st_ang, simt = pg.evaluate("() => [parseFloat(document.querySelector('#sch .part[data-ref=M1] text[data-var=\"1\"]').textContent), window.__bench.current().sim.run.t]")
+    check('BareMinimum13: the stepper turns at 10 rpm (60°/s of circuit time)', simt and -15 < st_ang - 60 * simt < 4, f'{st_ang}° after {simt} s')
     lit = pg.evaluate("() => [...document.querySelectorAll('#sch .part[data-ref=M1] .ph')].filter(e => e.getAttribute('fill') === '#ff2a1a').length")
     check('two phase LEDs on the ULN2003 board light (full-step drive)', lit == 2, str(lit))
     pg.screenshot(path=str(SHOTS / 'stepper.png'))
